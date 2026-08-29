@@ -25,12 +25,14 @@ export function ProjectCard({ project }: { project: ProjectRecord }) {
         <p className="truncate text-[12px] font-bold tracking-[0.08em] uppercase">
           {project.pkg.name}
         </p>
-        <p className="microlabel flex items-center gap-2 text-ink-faint">
-          <span>{partCount(project.pkg)} parts</span>
-          <span>·</span>
-          <span>★ {project.stars}</span>
-          <span>·</span>
-          <span className="truncate">{project.author}</span>
+        {/* A long author name must shorten itself rather than wrap the whole
+            meta line — the counts before it are fixed-width and should hold. */}
+        <p className="microlabel flex items-center gap-2 whitespace-nowrap text-ink-faint">
+          <span className="shrink-0">{partCount(project.pkg)} parts</span>
+          <span className="shrink-0">·</span>
+          <span className="shrink-0">★ {project.stars}</span>
+          <span className="shrink-0">·</span>
+          <span className="min-w-0 truncate">{project.author}</span>
         </p>
       </div>
     </Link>

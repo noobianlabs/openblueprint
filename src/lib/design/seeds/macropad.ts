@@ -1,0 +1,356 @@
+import type { ProjectRecord } from "../schema";
+
+export const macropad: ProjectRecord = {
+  slug: "four-key-macropad",
+  author: "keebworks",
+  source: "seed",
+  stars: 9,
+  createdAt: "2026-08-11T18:15:00Z",
+  cover: { glyph: "▦", hueA: "#60a5fa", hueB: "#a78bfa" },
+  pkg: {
+    name: "4-Key Macropad",
+    summary:
+      "A hand-wired four-key macropad with a rotary encoder for volume or scrub control and one addressable LED under every key. An RP2040 board enumerates as a standard USB HID keyboard, so layers, macros, and encoder actions live entirely in firmware and need no host driver. Each switch is wired directly to its own GPIO with an internal pull-up rather than into a matrix, which keeps the harness to five wires and makes chording behave predictably.",
+    tags: ["USB HID", "PER-KEY RGB", "ROTARY ENCODER", "PRINTED CASE"],
+    parts: [
+      {
+        id: "rp2040",
+        name: "RP2040 Zero Board",
+        role: "Main Logic Controller",
+        description:
+          "Postage-stamp RP2040 board running the HID stack. Its onboard LDO derives the 3.3V logic rail from USB VBUS, so no external regulator is needed.",
+        category: "mcu",
+        domain: "electrical",
+        qty: 1,
+        unitCost: 5.5,
+        pins: ["5V", "GND", "GP2", "GP3", "GP4", "GP5", "GP6", "GP7", "GP8", "GP9", "USB_D+", "USB_D-"],
+      },
+      {
+        id: "switches",
+        name: "MX-Style Mechanical Switches",
+        role: "Key Switches",
+        description:
+          "Four plate-mount switches, one GPIO each with a shared ground leg; tactile or linear is purely preference here.",
+        category: "sensor",
+        domain: "electrical",
+        qty: 4,
+        unitCost: 0.9,
+        pins: ["SW1", "SW2", "SW3", "SW4", "COM"],
+      },
+      {
+        id: "encoder",
+        name: "EC11 Rotary Encoder",
+        role: "Rotary Input",
+        description:
+          "Detented quadrature encoder with an integrated push switch, debounced in firmware rather than with RC networks.",
+        category: "sensor",
+        domain: "electrical",
+        qty: 1,
+        unitCost: 1.6,
+        pins: ["A", "B", "GND", "SW"],
+      },
+      {
+        id: "leds",
+        name: "SK6812 MINI-E LEDs",
+        role: "Per-Key Lighting",
+        description:
+          "Reverse-mount addressable LEDs that sit inside the switch housing; each output feeds the next LED's input to form one chain off a single GPIO.",
+        category: "display",
+        domain: "electrical",
+        qty: 4,
+        unitCost: 0.45,
+        pins: ["VCC", "GND", "DIN"],
+      },
+      {
+        id: "usbc",
+        name: "USB-C Breakout with 5.1k CC Resistors",
+        role: "Host Interface",
+        description:
+          "Panel-mount daughterboard carrying VBUS, ground, and the USB data pair to the recessed controller. The CC pull-downs are what make a C-to-C cable supply power at all.",
+        category: "comms",
+        domain: "electrical",
+        qty: 1,
+        unitCost: 1.8,
+        pins: ["VBUS", "GND", "D+", "D-"],
+      },
+      {
+        id: "case-bottom",
+        name: "Case Bottom Shell",
+        role: "Main Housing",
+        description: "Tray-mount shell holding the controller, the USB-C daughterboard, and the foam pad, with four insert bosses.",
+        category: "print3d",
+        domain: "mechanical",
+        qty: 1,
+        unitCost: 3.2,
+        printSettings: "PLA · 25% infill, 0.2mm layer, 4 perimeters",
+      },
+      {
+        id: "case-top",
+        name: "Case Top Plate",
+        role: "Switch Plate",
+        description: "Top plate with four 14.0mm switch cutouts and the encoder bushing hole, printed flat for clean square openings.",
+        category: "print3d",
+        domain: "mechanical",
+        qty: 1,
+        unitCost: 2.4,
+        printSettings: "PLA · 40% infill, 0.16mm layer, 5 perimeters",
+      },
+      {
+        id: "knob",
+        name: "Encoder Knob",
+        role: "Rotary Cap",
+        description: "Knurled knob for the 6mm D-shaft, sized so a fingertip clears the nearest keycap.",
+        category: "print3d",
+        domain: "mechanical",
+        qty: 1,
+        unitCost: 0.6,
+        printSettings: "PLA · 30% infill, 0.12mm layer",
+      },
+      {
+        id: "diffuser",
+        name: "Per-Key Diffuser Rings",
+        role: "Light Diffusers",
+        description: "Thin rings printed in natural filament that sit under each switch and soften the LED hotspot into an even glow.",
+        category: "print3d",
+        domain: "mechanical",
+        qty: 4,
+        unitCost: 0.3,
+        printSettings: "Natural PETG · 15% infill, 0.12mm layer, 2 perimeters",
+      },
+      {
+        id: "keycaps",
+        name: "MX Keycaps",
+        role: "Key Tops",
+        description: "Four blank shine-through caps; profile is preference, but shine-through is what makes the per-key LEDs worth wiring.",
+        category: "misc",
+        domain: "mechanical",
+        qty: 4,
+        unitCost: 1.1,
+      },
+      {
+        id: "foam",
+        name: "Case Foam Sheet",
+        role: "Acoustic Damping",
+        description: "3mm EVA sheet cut to the tray floor; it kills the hollow ring a small printed case otherwise has.",
+        category: "misc",
+        domain: "mechanical",
+        qty: 1,
+        unitCost: 1.5,
+      },
+      {
+        id: "feet",
+        name: "Silicone Bumper Feet",
+        role: "Desk Grip",
+        description: "Self-adhesive domes keeping a 200g macropad from sliding when a key is struck.",
+        category: "misc",
+        domain: "mechanical",
+        qty: 4,
+        unitCost: 0.1,
+      },
+      {
+        id: "hardware",
+        name: "M3 Screws + Heat-Set Inserts",
+        role: "Fastener Set",
+        description: "Four M3x6 socket screws and matching brass inserts joining the top plate to the shell.",
+        category: "misc",
+        domain: "mechanical",
+        qty: 8,
+        unitCost: 0.2,
+      },
+    ],
+    connections: [
+      { id: "c1", from: { part: "usbc", pin: "VBUS" }, to: { part: "rp2040", pin: "5V" }, net: "power", label: "5V" },
+      { id: "c2", from: { part: "usbc", pin: "GND" }, to: { part: "rp2040", pin: "GND" }, net: "ground" },
+      { id: "c3", from: { part: "usbc", pin: "D+" }, to: { part: "rp2040", pin: "USB_D+" }, net: "data", label: "USB 2.0" },
+      { id: "c4", from: { part: "usbc", pin: "D-" }, to: { part: "rp2040", pin: "USB_D-" }, net: "data", label: "USB 2.0" },
+      { id: "c5", from: { part: "rp2040", pin: "5V" }, to: { part: "leds", pin: "VCC" }, net: "power", label: "5V" },
+      { id: "c6", from: { part: "rp2040", pin: "GND" }, to: { part: "leds", pin: "GND" }, net: "ground" },
+      { id: "c7", from: { part: "rp2040", pin: "GP9" }, to: { part: "leds", pin: "DIN" }, net: "data", label: "LED chain" },
+      { id: "c8", from: { part: "switches", pin: "SW1" }, to: { part: "rp2040", pin: "GP2" }, net: "data", label: "key 1" },
+      { id: "c9", from: { part: "switches", pin: "SW2" }, to: { part: "rp2040", pin: "GP3" }, net: "data", label: "key 2" },
+      { id: "c10", from: { part: "switches", pin: "SW3" }, to: { part: "rp2040", pin: "GP4" }, net: "data", label: "key 3" },
+      { id: "c11", from: { part: "switches", pin: "SW4" }, to: { part: "rp2040", pin: "GP5" }, net: "data", label: "key 4" },
+      { id: "c12", from: { part: "switches", pin: "COM" }, to: { part: "rp2040", pin: "GND" }, net: "ground" },
+      { id: "c13", from: { part: "encoder", pin: "A" }, to: { part: "rp2040", pin: "GP6" }, net: "data", label: "quadrature" },
+      { id: "c14", from: { part: "encoder", pin: "B" }, to: { part: "rp2040", pin: "GP7" }, net: "data", label: "quadrature" },
+      { id: "c15", from: { part: "encoder", pin: "SW" }, to: { part: "rp2040", pin: "GP8" }, net: "data", label: "encoder push" },
+      { id: "c16", from: { part: "encoder", pin: "GND" }, to: { part: "rp2040", pin: "GND" }, net: "ground" },
+    ],
+    assembly: [
+      {
+        part: "case-bottom",
+        children: [
+          { part: "foam" },
+          { part: "rp2040" },
+          { part: "usbc" },
+          {
+            part: "case-top",
+            children: [
+              { part: "diffuser" },
+              { part: "switches", children: [{ part: "leds" }, { part: "keycaps" }] },
+              { part: "encoder", children: [{ part: "knob" }] },
+            ],
+          },
+          { part: "feet" },
+          { part: "hardware" },
+        ],
+      },
+    ],
+    tools: [
+      "3D printer (PLA or PETG)",
+      "Soldering station with fine tip",
+      "Wire strippers",
+      "Flush cutters",
+      "Heat-set insert tool or fine soldering tip",
+      "M3 hex driver",
+      "Keycap and switch puller",
+      "Hobby knife",
+      "USB-C cable",
+      "Digital multimeter",
+    ],
+    assumptions: [
+      "A host computer that accepts a standard USB HID keyboard with no driver",
+      "Firmware built on a QMK-style or CircuitPython HID stack",
+      "MX-footprint switches and shine-through keycaps (the plate is cut for cross stems)",
+      "A temperature-controlled iron; the SK6812 packages deform above roughly 300°C",
+    ],
+    instructions: [
+      {
+        id: "1",
+        title: "Fabricate",
+        steps: [
+          {
+            id: "1.1",
+            title: "Print the case, knob, and diffusers",
+            detail:
+              "Print the shell and top plate in PLA and the diffuser rings in natural PETG at 0.12mm. Print the plate flat on the bed so the switch cutouts stay square — a raft or brim under them costs you the snap fit.",
+            tools: ["3D printer (PLA or PETG)"],
+            parts: ["case-bottom", "case-top", "knob", "diffuser"],
+          },
+          {
+            id: "1.2",
+            title: "Install heat-set inserts",
+            detail:
+              "Press the four brass inserts into the shell bosses with the insert tool, keeping each one square as it sinks. Let them cool fully before test-fitting a screw.",
+            tools: ["Heat-set insert tool or fine soldering tip"],
+            parts: ["case-bottom", "hardware"],
+          },
+          {
+            id: "1.3",
+            title: "Cut the foam and stick the feet",
+            detail:
+              "Trace the tray floor onto the EVA sheet, cut it slightly undersize so it does not bow, and set the four bumper feet just inside the shell corners.",
+            tools: ["Hobby knife"],
+            parts: ["foam", "feet", "case-bottom"],
+          },
+          {
+            id: "1.4",
+            title: "Dry-fit switches and encoder in the plate",
+            detail:
+              "Clip each switch into the plate with a diffuser ring beneath it and thread the encoder bushing through its hole. Pare any cutout that needs force rather than pressing harder — a cracked plate corner is unrepairable.",
+            tools: ["Flush cutters"],
+            parts: ["case-top", "switches", "diffuser", "encoder"],
+          },
+        ],
+      },
+      {
+        id: "2",
+        title: "Wire",
+        steps: [
+          {
+            id: "2.1",
+            title: "Connect the USB-C daughterboard",
+            detail:
+              "Run VBUS and ground to the controller's 5V and GND pads, then the data pair as a short twisted run to keep the two legs the same length.",
+            tools: ["Soldering station with fine tip", "Wire strippers"],
+            parts: ["usbc", "rp2040"],
+          },
+          {
+            id: "2.2",
+            title: "Hand-wire the four switches",
+            detail:
+              "Bridge one leg of every switch into a single ground bus using the clipped-off leg offcuts, then run each free leg to GP2-GP5. Firmware supplies the pull-ups, so no resistors are needed.",
+            tools: ["Soldering station with fine tip", "Flush cutters"],
+            parts: ["switches", "rp2040"],
+          },
+          {
+            id: "2.3",
+            title: "Wire the encoder",
+            detail:
+              "A and B to GP6 and GP7, the encoder's centre pin to ground, and the push switch to GP8. If rotation reads backwards later, swap A and B rather than editing the firmware.",
+            tools: ["Soldering station with fine tip", "Wire strippers"],
+            parts: ["encoder", "rp2040"],
+          },
+          {
+            id: "2.4",
+            title: "Chain the per-key LEDs",
+            detail:
+              "Solder the LEDs into the switch housings and daisy-chain data out to data in across all four, with the first input on GP9. Keep each joint under two seconds — these packages melt long before the solder is unhappy.",
+            tools: ["Soldering station with fine tip", "Flush cutters"],
+            parts: ["leds", "switches", "rp2040"],
+          },
+        ],
+      },
+      {
+        id: "3",
+        title: "Bring-up",
+        steps: [
+          {
+            id: "3.1",
+            title: "Check the rail before plugging in",
+            detail:
+              "With nothing connected, confirm there is no continuity between the 5V bus and ground, then check the USB-C breakout's CC resistors read about 5.1k to ground.",
+            tools: ["Digital multimeter"],
+            parts: ["usbc", "rp2040"],
+          },
+          {
+            id: "3.2",
+            title: "Flash the HID firmware",
+            detail:
+              "Drag the firmware onto the RP2040 bootloader volume and confirm the pad enumerates as a keyboard rather than a mass-storage device on reboot.",
+            tools: ["USB-C cable"],
+            parts: ["rp2040"],
+          },
+          {
+            id: "3.3",
+            title: "Verify every input and the LED chain",
+            detail:
+              "Press each key in a key-event viewer, rotate and click the encoder, and confirm all four LEDs light in order. A chain that stops partway points at the joint after the last LED that works.",
+            tools: ["USB-C cable"],
+            parts: ["rp2040", "switches", "encoder", "leds"],
+          },
+        ],
+      },
+      {
+        id: "4",
+        title: "Assemble",
+        steps: [
+          {
+            id: "4.1",
+            title: "Seat the plate assembly in the shell",
+            detail:
+              "Lower the wired plate into the tray, tuck the harness beside the controller, and start all four M3 screws before tightening any of them.",
+            tools: ["M3 hex driver"],
+            parts: ["case-top", "case-bottom", "switches", "encoder", "hardware"],
+          },
+          {
+            id: "4.2",
+            title: "Fit keycaps and knob",
+            detail:
+              "Press the caps on square with the puller as a guide, then set the knob height so it clears the nearest cap through a full rotation.",
+            tools: ["Keycap and switch puller"],
+            parts: ["keycaps", "knob", "switches", "encoder"],
+          },
+          {
+            id: "4.3",
+            title: "Close up and set the desk feel",
+            detail:
+              "Snug the screws in a diagonal pattern, confirm the foam is not pinched under the plate, and re-test one key from each corner before calling it done.",
+            tools: ["M3 hex driver"],
+            parts: ["case-bottom", "foam", "feet", "hardware"],
+          },
+        ],
+      },
+    ],
+  },
+};

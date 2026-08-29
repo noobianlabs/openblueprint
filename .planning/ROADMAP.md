@@ -6,11 +6,12 @@ Five phases take an empty repo to a shipped v1: scaffold + schema + seed data fi
 
 ## Phases
 
-- [x] **Phase 1: Foundation** - Next.js scaffold, DesignPackage schema, seed projects, design system, landing page (shipped 2026-08-29; 3 remaining seeds run in a parallel executor)
-- [ ] **Phase 2: Document views** - INFO, PARTS, INSTRUCTIONS tabs
-- [ ] **Phase 3: Diagram views** - WIRING node graph, MECH assembly tree
-- [ ] **Phase 4: Generation & persistence** - prompt → engine → project, localStorage, my projects, copy
+- [x] **Phase 1: Foundation** - Next.js scaffold, DesignPackage schema, seed projects, design system, landing page (shipped 2026-08-29)
+- [x] **Phase 2: Document views** - INFO, PARTS, INSTRUCTIONS tabs (shipped 2026-08-29)
+- [x] **Phase 3: Diagram views** - WIRING node graph, MECH assembly tree (shipped 2026-08-29)
+- [x] **Phase 4: Generation & persistence** - prompt → engine → project, localStorage, my projects, star, copy (shipped 2026-08-29)
 - [ ] **Phase 5: Verify & ship** - browser walkthrough, fixes, README/license, GitHub + ship notes
+- [ ] **Phase 6: Visual views** - part illustrations, 3D assembly viewer with STL export, ARCH block diagram
 
 ## Phase Details
 
@@ -84,7 +85,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | Complete | 2026-08-29 |
-| 2. Document views | 0/1 | In progress | - |
-| 3. Diagram views | 0/1 | In progress | - |
-| 4. Generation & persistence | 0/1 | Not started | - |
-| 5. Verify & ship | 0/1 | Not started | - |
+| 2. Document views | 1/1 | Complete | 2026-08-29 |
+| 3. Diagram views | 1/1 | Complete | 2026-08-29 |
+| 4. Generation & persistence | 1/1 | Complete | 2026-08-29 |
+| 5. Verify & ship | 1/1 | Complete | 2026-08-29 |
+| 6. Visual views | 0/1 | In progress | - |

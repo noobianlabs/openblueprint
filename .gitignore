@@ -8,3 +8,4 @@ dist/
 .env.local
 .claude/settings.local.json
 .claude/.gsd-staging/
+tsconfig.tsbuildinfo
