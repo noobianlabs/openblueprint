@@ -164,11 +164,16 @@ src/
     about/                  about page
     api/generate/           plan + build routes (Claude engine, server-only)
   components/
-    tabs/                   Info, Parts, Wiring, Mech, Instructions views
-    ProjectView.tsx         tab shell, star and copy actions
+    tabs/                   Info, Parts, Arch, Wiring, Mech, Instructions views
+    tabs/wiring/            node graph layout and part nodes
+    tabs/mech/              three.js assembly viewer and assembly tree
+    art/PartArt.tsx         procedural SVG illustration for any part
+    ProjectView.tsx         tab shell, deep links, star and copy actions
     PromptBox.tsx           the landing-page prompt input
   lib/
     design/schema.ts        DesignPackage — the type every view renders from
+    design/geometry.ts      deterministic part bodies; the visual spine
+    design/stl.ts           binary STL export for an assembly or one part
     design/seeds/           the four bundled community projects
     engine/types.ts         the DesignEngine contract both engines implement
     engine/local/           deterministic keyless engine: archetypes, part
@@ -183,9 +188,20 @@ src/
 
 This is v1. It is honest about what it does not do:
 
-- **No CAD generation.** The MECH tab shows the assembly tree; parametric geometry
-  and STL/STEP export are deferred, and the viewer panel is a placeholder.
-- **No AI image renders.** Project covers are a glyph on a gradient.
+- **The 3D view is a massing model, not CAD.** Part dimensions are *derived* from
+  category and name in `lib/design/geometry.ts`, not authored per part and not
+  taken from datasheets. The viewer and its STL export are good for understanding
+  what fits where and roughly how big it is; they are not manufacturing geometry,
+  and no STEP export exists. At rest the assembly reads somewhat spread out —
+  children sit on their parent's face rather than nested inside it.
+- **Part illustrations are schematic.** They are drawn from the same derived
+  geometry, so they show the right kind of body at roughly the right proportions,
+  not the actual product.
+- **No AI image renders.** The INFO hero composes part illustrations into a parts
+  plate; nothing is photorealistic.
+- **The Claude engine is unexercised.** It compiles and is wired behind
+  `ANTHROPIC_API_KEY`, but every design in this repo was produced by the local
+  engine. Expect rough edges the first time you point it at the API.
 - **No real sourcing links.** Parts are named and described but not linked to any
   distributor, and there is no stock or availability data.
 - **Cost figures are rough estimates**, not quotes. They will not match what you

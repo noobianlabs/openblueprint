@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-08-29)
 
 **Core value:** Prompt in → complete design package out across six views
-**Current focus:** Phase 6 — Visual views
+**Current focus:** v1 shipped — no phase in flight
 
 ## Current Position
 
-- Milestone: v1
-- Phase: 6 (Visual views) — executing
-- Status: Phases 1–5 shipped 2026-08-29
-- Last activity: 2026-08-29 — full browser walkthrough passed; star/copy wired to the store; README + LICENSE written
+- Milestone: v1 — COMPLETE
+- Phase: all six complete; nothing executing
+- Status: Phases 1–5 shipped 2026-08-29, Phase 6 shipped 2026-08-30
+- Last activity: 2026-08-30 — Phase 6 verified in the browser and pushed (b2bfe1f); all five phase issues closed
 
 ## Accumulated Decisions
 
@@ -36,6 +36,12 @@ See: .planning/PROJECT.md (updated 2026-08-29)
 
 - Linear MCP requires OAuth in an interactive session — user action needed before Linear sync
 
+## Known limits carried into v1
+
+- The Claude engine compiles and is wired behind `ANTHROPIC_API_KEY` but was never exercised — no key in this environment. Every design here came from the local engine.
+- MECH is a schematic massing model from derived dimensions, not CAD. At rest the assembly reads semi-exploded: children sit on a parent's face rather than nested inside it.
+- Cost figures are estimates, not quotes; no sourcing links.
+
 ## Session Continuity
 
-Next step: land Phase 6 visuals (part art, 3D viewer + STL, ARCH), re-verify in the browser, capture screenshots, ship.
+v1 is shipped. Natural next milestones, none started: nest MECH children inside their parent at rest, exercise and harden the Claude engine against a real key, sourcing links, and a project ZIP export.
