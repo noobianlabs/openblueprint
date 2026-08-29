@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 - Milestone: v1
-- Phase: 1 (Foundation)
-- Status: Planned, not started
-- Last activity: 2026-08-29 — project initialized, planning artifacts created, GSD Core installed locally
+- Phase: 2 ∥ 3 (Document views ∥ Diagram views), executing in parallel subagents
+- Status: Phase 1 shipped 2026-08-29
+- Last activity: 2026-08-29 — Phase 1 verified in browser and shipped; issue #1 closed
 
 ## Accumulated Decisions
 

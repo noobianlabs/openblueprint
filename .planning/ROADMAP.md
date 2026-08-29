@@ -6,7 +6,7 @@ Five phases take an empty repo to a shipped v1: scaffold + schema + seed data fi
 
 ## Phases
 
-- [ ] **Phase 1: Foundation** - Next.js scaffold, DesignPackage schema, seed projects, design system, landing page
+- [x] **Phase 1: Foundation** - Next.js scaffold, DesignPackage schema, seed projects, design system, landing page (shipped 2026-08-29; 3 remaining seeds run in a parallel executor)
 - [ ] **Phase 2: Document views** - INFO, PARTS, INSTRUCTIONS tabs
 - [ ] **Phase 3: Diagram views** - WIRING node graph, MECH assembly tree
 - [ ] **Phase 4: Generation & persistence** - prompt → engine → project, localStorage, my projects, copy
@@ -83,8 +83,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/1 | Not started | - |
-| 2. Document views | 0/1 | Not started | - |
-| 3. Diagram views | 0/1 | Not started | - |
+| 1. Foundation | 1/1 | Complete | 2026-08-29 |
+| 2. Document views | 0/1 | In progress | - |
+| 3. Diagram views | 0/1 | In progress | - |
 | 4. Generation & persistence | 0/1 | Not started | - |
 | 5. Verify & ship | 0/1 | Not started | - |

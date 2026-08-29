@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/*
+  OpenBlueprint design system.
+  Deliberately single-theme: a dark drafting-table surface, all-mono type.
+*/
+:root {
+  --bg: #0b0c0e;
+  --bg-raised: #121316;
+  --bg-card: #0f1012;
+  --bg-inset: #08090a;
+  --border: #232529;
+  --border-strong: #34373d;
+  --text: #e8eae7;
+  --text-dim: #9aa09b;
+  --text-faint: #60655f;
+  --accent: #3ddbb4;
+  --accent-dim: rgba(61, 219, 180, 0.14);
+
+  --cat-mcu: #a78bfa;
+  --cat-sensor: #4ade80;
+  --cat-actuator: #f87171;
+  --cat-power: #fbbf24;
+  --cat-comms: #22d3ee;
+  --cat-display: #60a5fa;
+  --cat-module: #fb923c;
+  --cat-enclosure: #f472b6;
+  --cat-print3d: #7dd3fc;
+  --cat-misc: #a1a1aa;
+
+  --net-data: #4ade80;
+  --net-power: #fbbf24;
+  --net-ground: #71717a;
+}
+
+@theme inline {
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-card: var(--bg-card);
+  --color-bg-inset: var(--bg-inset);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-ink-dim: var(--text-dim);
+  --color-ink-faint: var(--text-faint);
+  --color-accent: var(--accent);
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: #062019;
+}
+
+/* Uppercase micro-label used across the app */
+.microlabel {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Drafting-grid backdrop for hero and cover art */
+.blueprint-grid {
+  background-image:
+    linear-gradient(rgba(61, 219, 180, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 219, 180, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(61, 219, 180, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 219, 180, 0.03) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+}
+
+/* Category chip */
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--chip-color, var(--text-dim)) 35%, transparent);
+  color: var(--chip-color, var(--text-dim));
+  background: color-mix(in srgb, var(--chip-color, var(--text-dim)) 10%, transparent);
+}
+
+/* Thin scrollbars fitting the terminal look */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
