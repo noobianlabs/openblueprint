@@ -10,8 +10,8 @@ Five phases take an empty repo to a shipped v1: scaffold + schema + seed data fi
 - [x] **Phase 2: Document views** - INFO, PARTS, INSTRUCTIONS tabs (shipped 2026-08-29)
 - [x] **Phase 3: Diagram views** - WIRING node graph, MECH assembly tree (shipped 2026-08-29)
 - [x] **Phase 4: Generation & persistence** - prompt → engine → project, localStorage, my projects, star, copy (shipped 2026-08-29)
-- [ ] **Phase 5: Verify & ship** - browser walkthrough, fixes, README/license, GitHub + ship notes
-- [ ] **Phase 6: Visual views** - part illustrations, 3D assembly viewer with STL export, ARCH block diagram
+- [x] **Phase 5: Verify & ship** - browser walkthrough, fixes, README/license, GitHub + ship notes (shipped 2026-08-29)
+- [x] **Phase 6: Visual views** - part illustrations, 3D assembly viewer with STL export, ARCH block diagram (shipped 2026-08-30)
 
 ## Phase Details
 
@@ -89,4 +89,4 @@ Plans:
 | 3. Diagram views | 1/1 | Complete | 2026-08-29 |
 | 4. Generation & persistence | 1/1 | Complete | 2026-08-29 |
 | 5. Verify & ship | 1/1 | Complete | 2026-08-29 |
-| 6. Visual views | 0/1 | In progress | - |
+| 6. Visual views | 1/1 | Complete | 2026-08-30 |
