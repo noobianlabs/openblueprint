@@ -1,0 +1,19 @@
+{
+  "mode": "auto",
+  "granularity": "coarse",
+  "depth": "standard",
+  "workflow": {
+    "research": false,
+    "plan_check": true,
+    "verifier": true
+  },
+  "git": {
+    "branching": "none",
+    "commit_per_phase": true
+  },
+  "tracker": {
+    "provider": "github",
+    "notes_dir": ".planning/notes",
+    "shiplog": "SHIPLOG.md"
+  }
+}
