@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ProjectRecord } from "@/lib/design/schema";
 import { isStarred, makeUserRecord, saveProject, toggleStar } from "@/lib/store";
+import { buildProjectZip, exportFilename } from "@/lib/design/export";
 import { InfoTab } from "@/components/tabs/InfoTab";
 import { PartsTab } from "@/components/tabs/PartsTab";
 import { WiringTab } from "@/components/tabs/WiringTab";
@@ -28,6 +29,7 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
   const [tab, setTab] = useState<TabKey>("info");
   const [starred, setStarred] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [exportState, setExportState] = useState<"idle" | "working" | "done">("idle");
 
   /* Star state is browser-local; read it after mount so SSR and the first
      client render agree. */
@@ -56,6 +58,26 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
 
   function onStar() {
     setStarred(toggleStar(record.slug));
+  }
+
+  async function onExport() {
+    setExportState("working");
+    let url: string | null = null;
+    try {
+      const blob = await buildProjectZip(record, new Date());
+      url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFilename(record);
+      link.click();
+      setExportState("done");
+      window.setTimeout(() => setExportState("idle"), 2000);
+    } catch {
+      // Never strand the button mid-flight; the design is still on screen.
+      setExportState("idle");
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+    }
   }
 
   function onCopy() {
@@ -109,6 +131,15 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
               title="Save a copy to my projects"
             >
               ⧉ {copying ? "Copied" : "Copy"}
+            </button>
+            <button
+              type="button"
+              onClick={onExport}
+              disabled={exportState === "working"}
+              className="microlabel rounded-sm border border-line px-3 py-1.5 hover:border-line-strong hover:text-ink disabled:opacity-60"
+              title="Download design JSON, BOM CSV, instructions and STL as one ZIP"
+            >
+              ↓ {exportState === "working" ? "Packing" : exportState === "done" ? "Saved" : "Export"}
             </button>
           </div>
         </div>

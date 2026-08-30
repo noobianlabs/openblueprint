@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 import type { PartCategory, ProjectRecord } from "@/lib/design/schema";
 import { CATEGORY_META, fmtCost, subtotal, totalCost } from "@/lib/design/schema";
 import { dimsLabel, geometryFor } from "@/lib/design/geometry";
+import {
+  isSourceable,
+  PRINTED_PART_NOTE,
+  SOURCING_DISCLAIMER,
+  sourcingLinks,
+} from "@/lib/design/sourcing";
 import { PartThumb } from "@/components/tabs/PartThumb";
 
 const COL_QTY = "w-12 shrink-0 text-right tabular-nums";
@@ -78,6 +84,8 @@ export function PartsTab({ record }: { record: ProjectRecord }) {
         <ul>
           {visible.map((part) => {
             const meta = CATEGORY_META[part.category];
+            const bought = isSourceable(part);
+            const links = sourcingLinks(part);
             return (
               <li
                 key={part.id}
@@ -103,6 +111,43 @@ export function PartsTab({ record }: { record: ProjectRecord }) {
                   >
                     {meta.label}
                   </span>
+
+                  {/* Sourcing: keyword searches only — see lib/design/sourcing.ts. */}
+                  {!bought ? (
+                    <p className="mt-2 text-[12px] text-ink-faint">{PRINTED_PART_NOTE}</p>
+                  ) : links.length > 0 ? (
+                    <details className="group mt-2">
+                      {/* Hand-rolled instead of `.microlabel`, which is unlayered
+                          and would beat the hover colour. */}
+                      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-[11px] uppercase tracking-[0.12em] text-ink-faint hover:text-ink-dim focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                        <span
+                          aria-hidden="true"
+                          className="inline-block transition-transform group-open:rotate-90"
+                        >
+                          ▸
+                        </span>
+                        Search for this part
+                      </summary>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {links.map((link) => (
+                          <a
+                            key={link.vendor}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={link.description}
+                            aria-label={link.description}
+                            className="rounded-sm text-[12px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                        <span className="text-[11px] text-ink-faint">
+                          {SOURCING_DISCLAIMER}
+                        </span>
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
                 <span className={`${COL_QTY} text-[13px]`}>{part.qty}</span>
                 <span className={`${COL_UNIT} text-[13px] text-ink-dim`}>

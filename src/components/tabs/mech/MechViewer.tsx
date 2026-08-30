@@ -36,6 +36,8 @@ import type { AssemblySelection } from "@/components/tabs/mech/AssemblyTree";
 const SIBLING_GAP = 9;
 /** Clearance between separate root assemblies, mm. */
 const ROOT_GAP = 28;
+/** Nominal wall thickness used to keep a container's contents off its walls. */
+const WALL = 3;
 
 interface Measured {
   part: Part;
@@ -103,8 +105,10 @@ function measure(node: AssemblyNode, pkg: DesignPackage): Measured | null {
     geom,
     children,
     container: isContainer(part, geom),
-    spanW: Math.max(geom.w, gridW),
-    spanD: Math.max(geom.d, gridD),
+    /* A container swallows its children, so it spans only its own shell. An
+       open mount carries them on its face, where they may overhang. */
+    spanW: isContainer(part, geom) ? geom.w : Math.max(geom.w, gridW),
+    spanD: isContainer(part, geom) ? geom.d : Math.max(geom.d, gridD),
     cols,
     cellW,
     cellD,
@@ -141,15 +145,33 @@ function place(
     : baseY + node.geom.h;
 
   const rows = Math.ceil(node.children.length / node.cols);
-  const startX = cx - ((node.cols - 1) * node.cellW) / 2;
-  const startZ = cz - ((rows - 1) * node.cellD) / 2;
+
+  /* The grid is sized to the widest child, so it can easily out-span the parent
+     it belongs to — that is what made the rest pose read as already exploded,
+     with boards floating outside their own housing. Squeeze the pitch until the
+     span of child *centres* fits the parent's footprint (its interior, for a
+     container). Bodies may still overhang a little, which reads as a snug fit;
+     what matters is that children stay visually held by their parent. */
+  const fitW = node.container ? node.geom.w - WALL * 2 : node.geom.w;
+  const fitD = node.container ? node.geom.d - WALL * 2 : node.geom.d;
+  const cellW = node.cols > 1 ? Math.min(node.cellW, Math.max(fitW, 1) / (node.cols - 1)) : 0;
+  const cellD = rows > 1 ? Math.min(node.cellD, Math.max(fitD, 1) / (rows - 1)) : 0;
+
+  const startX = cx - ((node.cols - 1) * cellW) / 2;
+  const startZ = cz - ((rows - 1) * cellD) / 2;
 
   node.children.forEach((child, i) => {
+    /* A child wider than the box it nominally lives in cannot be inside it —
+       a 110 mm solar panel does not fit a 95 mm housing. Sit it on the lid
+       instead of letting it spear the walls. */
+    const oversized =
+      node.container && (child.spanW > fitW || child.spanD > fitD);
+
     place(
       child,
-      startX + (i % node.cols) * node.cellW,
-      startZ + Math.floor(i / node.cols) * node.cellD,
-      childBase,
+      startX + (i % node.cols) * cellW,
+      startZ + Math.floor(i / node.cols) * cellD,
+      oversized ? baseY + node.geom.h : childBase,
       depth + 1,
       path,
       i,
