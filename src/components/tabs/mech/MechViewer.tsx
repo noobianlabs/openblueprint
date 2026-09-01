@@ -1,267 +1,30 @@
 "use client";
 
 /**
- * Mech viewer — the assembly rendered as a schematic massing model.
+ * Mech viewer — the interactive shell around the assembly scene.
  *
- * Every part becomes one primitive body sized from `geometry.ts`, and the
- * assembly tree becomes the layout: a node's children are laid out in a grid
- * centred on it, sitting on its top face, or dropped inside it when the node is
- * big enough to be a container. That is the whole trick — the tree already
- * encodes what mounts to what, so nothing else has to be authored.
- *
- * The model is deliberately approximate. It answers "what goes where, and how
- * big is this thing" — not "will this part fit its footprint to 0.1 mm".
+ * The model itself (layout, bodies, materials, lights, ground) is built by
+ * `scene.ts`, which knows nothing about React; this file owns the canvas, the
+ * orbit gestures, picking, the HUD and the STL buttons.
  *
  * three.js is heavy, so this module is loaded lazily by MechTab and owns the
- * whole viewer surface (canvas, toolbar, HUD) to keep three out of the tab's
- * eager chunk.
+ * whole viewer surface to keep three out of the tab's eager chunk.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import {
-  CATEGORY_META,
-  partById,
-  type AssemblyNode,
-  type DesignPackage,
-  type Part,
-} from "@/lib/design/schema";
-import { dimsLabel, geometryFor, type PartGeometry } from "@/lib/design/geometry";
-import { cylinderProfile, stlFilename, toStl, type StlSolid } from "@/lib/design/stl";
+import { CATEGORY_META } from "@/lib/design/schema";
+import type { DesignPackage } from "@/lib/design/schema";
+import { dimsLabel } from "@/lib/design/geometry";
+import { stlFilename, toStl, type StlSolid } from "@/lib/design/stl";
 import type { AssemblySelection } from "@/components/tabs/mech/AssemblyTree";
-
-/* ---------- Layout ---------- */
-
-/** Clearance between siblings, mm. */
-const SIBLING_GAP = 9;
-/** Clearance between separate root assemblies, mm. */
-const ROOT_GAP = 28;
-/** Nominal wall thickness used to keep a container's contents off its walls. */
-const WALL = 3;
-
-interface Measured {
-  part: Part;
-  geom: PartGeometry;
-  children: Measured[];
-  /** Children drop inside this body rather than standing on its lid. */
-  container: boolean;
-  /** Footprint of this node and everything mounted to it. */
-  spanW: number;
-  spanD: number;
-  cols: number;
-  cellW: number;
-  cellD: number;
-}
-
-export interface PlacedPart {
-  /** Matches AssemblyTree's row path, so selection maps both ways. */
-  path: string;
-  part: Part;
-  geom: PartGeometry;
-  depth: number;
-  container: boolean;
-  /** Centre of the body's bounding box, mm. */
-  x: number;
-  y: number;
-  z: number;
-}
-
-/**
- * A box body counts as a container when it is an enclosure, or simply tall
- * enough that dropping things inside reads better than stacking them on top.
- * A 16 mm-tall bracket fails that test, which is right — parts sit *on* a
- * bracket.
- */
-function isContainer(part: Part, geom: PartGeometry): boolean {
-  return geom.shape === "box" && (part.category === "enclosure" || geom.h >= 25);
-}
-
-function measure(node: AssemblyNode, pkg: DesignPackage): Measured | null {
-  const part = partById(pkg, node.part);
-  if (!part) return null;
-
-  const geom = geometryFor(part);
-  const children = (node.children ?? [])
-    .map((child) => measure(child, pkg))
-    .filter((child): child is Measured => child !== null);
-
-  let cols = 0;
-  let cellW = 0;
-  let cellD = 0;
-  let gridW = 0;
-  let gridD = 0;
-
-  if (children.length > 0) {
-    cols = Math.ceil(Math.sqrt(children.length));
-    const rows = Math.ceil(children.length / cols);
-    cellW = Math.max(...children.map((c) => c.spanW)) + SIBLING_GAP;
-    cellD = Math.max(...children.map((c) => c.spanD)) + SIBLING_GAP;
-    gridW = cols * cellW;
-    gridD = rows * cellD;
-  }
-
-  return {
-    part,
-    geom,
-    children,
-    container: isContainer(part, geom),
-    /* A container swallows its children, so it spans only its own shell. An
-       open mount carries them on its face, where they may overhang. */
-    spanW: isContainer(part, geom) ? geom.w : Math.max(geom.w, gridW),
-    spanD: isContainer(part, geom) ? geom.d : Math.max(geom.d, gridD),
-    cols,
-    cellW,
-    cellD,
-  };
-}
-
-function place(
-  node: Measured,
-  cx: number,
-  cz: number,
-  baseY: number,
-  depth: number,
-  parentPath: string,
-  index: number,
-  out: PlacedPart[],
-): void {
-  const path = `${parentPath}/${node.part.id}#${index}`;
-  out.push({
-    path,
-    part: node.part,
-    geom: node.geom,
-    depth,
-    container: node.container,
-    x: cx,
-    y: baseY + node.geom.h / 2,
-    z: cz,
-  });
-
-  if (node.children.length === 0) return;
-
-  // Inside a container children rest on the floor; otherwise on the lid.
-  const childBase = node.container
-    ? baseY + Math.min(3, Math.max(1, node.geom.h * 0.08))
-    : baseY + node.geom.h;
-
-  const rows = Math.ceil(node.children.length / node.cols);
-
-  /* The grid is sized to the widest child, so it can easily out-span the parent
-     it belongs to — that is what made the rest pose read as already exploded,
-     with boards floating outside their own housing. Squeeze the pitch until the
-     span of child *centres* fits the parent's footprint (its interior, for a
-     container). Bodies may still overhang a little, which reads as a snug fit;
-     what matters is that children stay visually held by their parent. */
-  const fitW = node.container ? node.geom.w - WALL * 2 : node.geom.w;
-  const fitD = node.container ? node.geom.d - WALL * 2 : node.geom.d;
-  const cellW = node.cols > 1 ? Math.min(node.cellW, Math.max(fitW, 1) / (node.cols - 1)) : 0;
-  const cellD = rows > 1 ? Math.min(node.cellD, Math.max(fitD, 1) / (rows - 1)) : 0;
-
-  const startX = cx - ((node.cols - 1) * cellW) / 2;
-  const startZ = cz - ((rows - 1) * cellD) / 2;
-
-  node.children.forEach((child, i) => {
-    /* A child wider than the box it nominally lives in cannot be inside it —
-       a 110 mm solar panel does not fit a 95 mm housing. Sit it on the lid
-       instead of letting it spear the walls. */
-    const oversized =
-      node.container && (child.spanW > fitW || child.spanD > fitD);
-
-    place(
-      child,
-      startX + (i % node.cols) * cellW,
-      startZ + Math.floor(i / node.cols) * cellD,
-      oversized ? baseY + node.geom.h : childBase,
-      depth + 1,
-      path,
-      i,
-      out,
-    );
-  });
-}
-
-/** Flatten the assembly tree into placed bodies, roots standing on y = 0. */
-export function layoutAssembly(pkg: DesignPackage): PlacedPart[] {
-  const roots = pkg.assembly
-    .map((node) => measure(node, pkg))
-    .filter((node): node is Measured => node !== null);
-  if (roots.length === 0) return [];
-
-  const cols = Math.ceil(Math.sqrt(roots.length));
-  const rows = Math.ceil(roots.length / cols);
-  const cellW = Math.max(...roots.map((r) => r.spanW)) + ROOT_GAP;
-  const cellD = Math.max(...roots.map((r) => r.spanD)) + ROOT_GAP;
-  const startX = -((cols - 1) * cellW) / 2;
-  const startZ = -((rows - 1) * cellD) / 2;
-
-  const out: PlacedPart[] = [];
-  roots.forEach((root, i) => {
-    place(
-      root,
-      startX + (i % cols) * cellW,
-      startZ + Math.floor(i / cols) * cellD,
-      0,
-      0,
-      "",
-      i,
-      out,
-    );
-  });
-  return out;
-}
-
-/* ---------- Mesh building ---------- */
-
-/** Deterministic 0–1 from a part id, for per-part roughness variation. */
-function grain(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (Math.abs(h) % 100) / 100;
-}
-
-/**
- * Bodies for one part, matching `stl.ts` primitive for primitive so the
- * download is the thing on screen.
- */
-function bodiesFor(geom: PartGeometry): THREE.BufferGeometry[] {
-  switch (geom.shape) {
-    case "cylinder": {
-      const { radius, length, axis } = cylinderProfile(geom);
-      const body = new THREE.CylinderGeometry(radius, radius, length, 24);
-      // stl.ts tips local Y onto world Z with the same quarter turn about X.
-      if (axis === "z") body.rotateX(Math.PI / 2);
-      return [body];
-    }
-
-    case "dome": {
-      const radius = geom.w / 2;
-      const flangeH = Math.max(0.8, geom.h * 0.2);
-      const domeH = Math.max(0.1, geom.h - flangeH);
-      const flange = new THREE.CylinderGeometry(radius * 1.1, radius * 1.1, flangeH, 24);
-      flange.translate(0, -geom.h / 2 + flangeH / 2, 0);
-      const dome = new THREE.SphereGeometry(radius, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-      dome.scale(1, domeH / radius, 1);
-      dome.translate(0, -geom.h / 2 + flangeH, 0);
-      return [flange, dome];
-    }
-
-    case "fastener": {
-      const headH = geom.h * 0.22;
-      const shaftH = geom.h - headH;
-      const shaft = new THREE.CylinderGeometry(geom.w * 0.24, geom.w * 0.24, shaftH, 16);
-      shaft.translate(0, -geom.h / 2 + shaftH / 2, 0);
-      const head = new THREE.CylinderGeometry(geom.w / 2, geom.w / 2, headH, 16);
-      head.translate(0, geom.h / 2 - headH / 2, 0);
-      return [shaft, head];
-    }
-
-    default:
-      return [new THREE.BoxGeometry(geom.w, geom.h, geom.d)];
-  }
-}
+import {
+  applyRendererProfile,
+  buildAssemblyGroup,
+  buildGround,
+  buildLighting,
+  layoutAssembly,
+} from "@/components/tabs/mech/scene";
 
 /* ---------- Component ---------- */
 
@@ -313,9 +76,8 @@ export function MechViewer({
       setUnsupported(true);
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    applyRendererProfile(renderer);
     renderer.setSize(host.clientWidth || 1, host.clientHeight || 1, false);
-    renderer.setClearColor(0x000000, 0);
 
     const canvas = renderer.domElement;
     canvas.style.width = "100%";
@@ -328,62 +90,9 @@ export function MechViewer({
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 20000);
 
-    const geometries: THREE.BufferGeometry[] = [];
-    const materials: THREE.Material[] = [];
-    const groups = new Map<string, THREE.Group>();
-    const pickables: THREE.Mesh[] = [];
-    const bounds = new THREE.Box3();
-
-    for (const item of placed) {
-      const group = new THREE.Group();
-      group.position.set(item.x, item.y, item.z);
-
-      const transparent = item.container || item.part.category === "enclosure";
-      const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(item.geom.color),
-        roughness: 0.42 + grain(item.part.id) * 0.34,
-        metalness: 0.08,
-        transparent,
-        opacity: transparent ? 0.25 : 1,
-        depthWrite: !transparent,
-        side: transparent ? THREE.DoubleSide : THREE.FrontSide,
-      });
-      materials.push(material);
-
-      for (const body of bodiesFor(item.geom)) {
-        geometries.push(body);
-        const mesh = new THREE.Mesh(body, material);
-        mesh.userData.path = item.path;
-        mesh.userData.container = transparent;
-        group.add(mesh);
-        pickables.push(mesh);
-      }
-
-      // A pin header makes a bare board read as a board.
-      if (item.geom.headerPins > 0) {
-        const header = new THREE.BoxGeometry(2.4, 2.2, Math.min(item.geom.d * 0.8, item.geom.headerPins * 2.54));
-        geometries.push(header);
-        const headerMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.85 });
-        materials.push(headerMat);
-        const strip = new THREE.Mesh(header, headerMat);
-        strip.position.set(item.geom.w / 2 - 1.6, item.geom.h / 2 + 1.1, 0);
-        group.add(strip);
-      }
-
-      scene.add(group);
-      groups.set(item.path, group);
-      bounds.expandByPoint(
-        new THREE.Vector3(item.x - item.geom.w / 2, item.y - item.geom.h / 2, item.z - item.geom.d / 2),
-      );
-      bounds.expandByPoint(
-        new THREE.Vector3(item.x + item.geom.w / 2, item.y + item.geom.h / 2, item.z + item.geom.d / 2),
-      );
-    }
-
-    const centroid = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3());
-    const span = Math.max(size.x, size.y, size.z, 10);
-    const radius = size.length() / 2;
+    const assembly = buildAssemblyGroup(pkg, placed);
+    scene.add(assembly.group);
+    const { centroid, span, radius, meshesByPath: groups, pickables } = assembly;
 
     /* Explode offsets: push outward from the centroid, and lift by depth so a
        nested stack unpacks upward instead of smearing sideways. Parts sitting
@@ -400,26 +109,16 @@ export function MechViewer({
       offsets.set(item.path, delta);
     });
 
-    scene.add(new THREE.HemisphereLight(0xbfe4ff, 0x0a0b0d, 1.6));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(span * 0.8, span * 1.4, span * 0.9);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0x3ddbb4, 0.85);
-    rim.position.set(-span, span * 0.5, -span * 0.7);
-    scene.add(rim);
+    scene.add(buildLighting(span));
 
-    const gridSize = Math.ceil((span * 2.6) / 10) * 10;
-    const grid = new THREE.GridHelper(gridSize, Math.max(8, Math.round(gridSize / 10)), 0x3ddbb4, 0x2a2e34);
-    const gridMat = grid.material as THREE.Material;
-    gridMat.transparent = true;
-    gridMat.opacity = 0.22;
-    gridMat.depthWrite = false;
-    grid.position.set(centroid.x, -0.05, centroid.z);
-    scene.add(grid);
+    const ground = buildGround(centroid, assembly.size, span);
+    scene.add(ground.group);
 
     const outline = new THREE.BoxHelper(new THREE.Object3D(), 0x3ddbb4);
     (outline.material as THREE.LineBasicMaterial).depthTest = false;
+    // The selection outline is UI, not lit geometry — keep ACES off it so it
+    // stays the same accent as the chips in the HUD.
+    (outline.material as THREE.LineBasicMaterial).toneMapped = false;
     outline.visible = false;
     scene.add(outline);
 
@@ -470,18 +169,7 @@ export function MechViewer({
 
     function setSelected(path: string | null, moveCamera: boolean) {
       view.selected = path;
-      for (const item of placed) {
-        const group = groups.get(item.path);
-        if (!group) continue;
-        const mesh = group.children[0] as THREE.Mesh;
-        const material = mesh.material as THREE.MeshStandardMaterial;
-        const active = item.path === path;
-        material.emissive.setHex(active ? 0x3ddbb4 : 0x000000);
-        material.emissiveIntensity = active ? 0.55 : 0;
-        if (item.container || item.part.category === "enclosure") {
-          material.opacity = active ? 0.45 : 0.25;
-        }
-      }
+      assembly.setSelected(path);
       const group = path ? groups.get(path) : null;
       outline.visible = Boolean(group);
       if (group && moveCamera) view.focus = group.position.clone();
@@ -650,17 +338,15 @@ export function MechViewer({
       canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("contextmenu", onContextMenu);
-      for (const g of geometries) g.dispose();
-      for (const m of materials) m.dispose();
+      assembly.dispose();
+      ground.dispose();
       outline.geometry.dispose();
       (outline.material as THREE.Material).dispose();
-      grid.geometry.dispose();
-      gridMat.dispose();
       scene.clear();
       renderer.dispose();
       canvas.remove();
     };
-  }, [placed]);
+  }, [pkg, placed]);
 
   /* Sidebar selection drives the scene; scene clicks go back out through
      onSelect, so the tab's state stays the single source of truth. */

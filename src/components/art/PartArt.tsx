@@ -8,8 +8,19 @@
  * One projection for everything — a cabinet oblique with width across the
  * screen, height up it, and depth receding up and to the right. A board and
  * the case it bolts into therefore look drawn by the same hand. Round bodies
- * (cylinder, dome, fastener) stand on their axis and use the same depth
- * foreshortening for their cross-section ellipses.
+ * (cylinder, dome, fastener) stand on their axis: their caps and rims are
+ * sampled through the same `project()` used for prism faces (via
+ * `circleTransform`/`frontRim`/`bandOutline`/`collarOutline` below), so a can
+ * and the board next to it tilt in agreement instead of one going straight-on
+ * while the other skews.
+ *
+ * Each body is lit from directly above: a lighter top face, a mid-tone front
+ * face, a darker side face, computed by mixing the category tint toward
+ * white/black (`shade`) rather than by layering flat alpha — that's what
+ * gives the three faces of a box visibly different tones instead of just
+ * different transparencies over whatever sits behind them. A soft seated
+ * shadow (sheared the same way as everything else) grounds every part so it
+ * reads as sitting on a surface rather than floating.
  */
 
 import type { ReactNode } from "react";
@@ -22,8 +33,6 @@ import { geometryFor, maxExtent } from "@/lib/design/geometry";
 /** Screen offset per mm of depth. Height maps to exactly (0, -1). */
 const DEPTH_X = 0.4;
 const DEPTH_Y = 0.5;
-/** A circle lying in the plan (x/z) plane projects to this squash. */
-const ELLIPSE_K = DEPTH_Y;
 
 /** Square drawing field. The part is fitted and centred inside the padding. */
 const VIEW = 100;
@@ -107,6 +116,81 @@ function planQuad(x0: number, z0: number, x1: number, z1: number, y: number): Pt
   return [project(x0, y, z0), project(x1, y, z0), project(x1, y, z1), project(x0, y, z1)];
 }
 
+/* ---------- round-body projection ----------
+ *
+ * A vertical circle (cylinder cap, dome flange, fastener head) is the image
+ * of a plan circle under `project`. Two facts make that image easy to draw
+ * exactly, with no per-shape trigonometry:
+ *
+ *  1. The screen-X extreme of a plan circle (its left/right tangent point)
+ *     sits at a fixed angle, independent of height or depth offset — because
+ *     `project`'s X ignores height and only shifts with depth linearly.
+ *  2. A *full* circle maps to an ellipse by an exact affine transform: a
+ *     unit circle scaled to radius r, then sheared by the same
+ *     (DEPTH_X, -DEPTH_Y) that `project` applies to z. SVG's `matrix()`
+ *     transform expresses that directly, so `<circle r>` under
+ *     `circleTransform(...)` renders the identical ellipse `project` would
+ *     produce point-by-point.
+ *
+ * A *partial* arc (the visible sliver of a base rim, where a straight SVG
+ * arc command can't share a transform with the straight walls beside it in
+ * one path) is instead sampled directly through `project` — `frontRim`.
+ */
+
+/** Angle of the rightmost screen-X point on any plan circle under `project`. */
+const TANGENT_R = Math.atan2(DEPTH_X, 1);
+
+/** Left (-1) or right (+1) tangent point of the plan circle (cx, cz) r, at height y. */
+function tangent(cx: number, y: number, cz: number, r: number, side: -1 | 1): Pt {
+  const a = side > 0 ? TANGENT_R : TANGENT_R + Math.PI;
+  return project(cx + r * Math.cos(a), y, cz + r * Math.sin(a));
+}
+
+/**
+ * Sampled points along the viewer-facing half of the plan circle (cx, cz) r
+ * at height y, left tangent to right tangent, passing through the near pole.
+ */
+function frontRim(cx: number, y: number, cz: number, r: number, steps: number): Pt[] {
+  const pts: Pt[] = [];
+  const start = TANGENT_R - Math.PI;
+  for (let i = 0; i <= steps; i++) {
+    const a = start + (Math.PI * i) / steps;
+    pts.push(project(cx + r * Math.cos(a), y, cz + r * Math.sin(a)));
+  }
+  return pts;
+}
+
+/** Exact affine map from a local unit circle onto the screen ellipse a plan
+ *  circle at (cx, y, cz) projects to — apply to `<circle>`/`<ellipse rx=ry>`. */
+function circleTransform(cx: number, y: number, cz: number): string {
+  const [sx, sy] = project(cx, y, cz);
+  return `matrix(1,0,${n(DEPTH_X)},${n(-DEPTH_Y)},${n(sx)},${n(sy)})`;
+}
+
+/**
+ * Silhouette of a cylindrical band standing from y0 to y1: two straight
+ * walls plus the visible front sliver of its base rim. Its open top edge is
+ * a straight chord between the tangent points — meant to be covered by a
+ * full top ellipse (via `circleTransform`) drawn afterward, layered above.
+ */
+function bandOutline(cx: number, cz: number, r: number, y0: number, y1: number, steps: number): string {
+  const lTop = tangent(cx, y1, cz, r, -1);
+  const rTop = tangent(cx, y1, cz, r, 1);
+  const rim = frontRim(cx, y0, cz, r, steps);
+  return poly([lTop, ...rim, rTop]);
+}
+
+/**
+ * Silhouette of a collar (a band whose top is only partly visible, e.g. a
+ * flange with a dome rising out of its centre): curved front rims at both
+ * y0 and y1, joined by straight walls at their shared tangent points.
+ */
+function collarOutline(cx: number, cz: number, r: number, y0: number, y1: number, steps: number): string {
+  const rimLo = frontRim(cx, y0, cz, r, steps);
+  const rimHi = frontRim(cx, y1, cz, r, steps);
+  return poly([...rimLo, ...rimHi.slice().reverse()]);
+}
+
 /**
  * Round bodies carry two matching cross-section dimensions and one axis.
  * Picking the odd one out stands an 18×18×65 cell tall while keeping a
@@ -123,13 +207,37 @@ function roundAxis(g: PartGeometry): { dia: number; len: number } {
   return { dia: options[0].dia, len: options[0].len };
 }
 
+/* ---------- colour ---------- */
+
+/** Mix a `#rrggbb` colour toward white (amt > 0) or black (amt < 0). Pure,
+ *  deterministic — the top-light shading model is entirely this function. */
+function shade(hex: string, amt: number): string {
+  const num = parseInt(hex.slice(1), 16);
+  const target = amt >= 0 ? 255 : 0;
+  const k = Math.min(1, Math.abs(amt));
+  const mix = (channel: number) => Math.round(channel + (target - channel) * k);
+  const r = mix((num >> 16) & 0xff);
+  const g = mix((num >> 8) & 0xff);
+  const b = mix(num & 0xff);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
+/** Three tones lit from directly above: a bright top, a mid front, a dark side. */
+function tones(color: string) {
+  return {
+    top: shade(color, 0.34),
+    front: shade(color, -0.08),
+    side: shade(color, -0.42),
+    edge: shade(color, 0.55),
+  };
+}
+
 /* ---------- shared ink ---------- */
 
-/** Face alphas, lit from the top so the three faces read apart. */
-const FACE_TOP = 0.26;
-const FACE_FRONT = 0.15;
-const FACE_SIDE = 0.09;
-const EDGE = 0.8;
+const FILL_TOP = 0.94;
+const FILL_FRONT = 0.86;
+const FILL_SIDE = 0.86;
+const EDGE_OP = 0.55;
 /** Neutral marks — silkscreen, vents, threads — ride on `currentColor`. */
 const MARK = 0.45;
 
@@ -138,11 +246,23 @@ interface Skin {
   sw: number;
   /** Above thumbnail size, where sub-millimetre detail still resolves. */
   fine: boolean;
+  /** Per-instance id prefix — keeps this part's <defs> ids collision-free
+   *  when several PartArts (or the same part at two sizes) share a page. */
+  uid: string;
 }
 
 interface Drawing {
   box: Box;
-  render: (sk: Skin) => ReactNode;
+  render: (sk: Skin, t: ReturnType<typeof tones>, color: string) => ReactNode;
+}
+
+/** Plan half-extents used to size and place the seated shadow. */
+function shadowFootprint(g: PartGeometry): { rx: number; rz: number } {
+  if (g.shape === "cylinder" || g.shape === "dome" || g.shape === "fastener") {
+    const { dia } = roundAxis(g);
+    return { rx: dia / 2, rz: dia / 2 };
+  }
+  return { rx: g.w / 2, rz: g.d / 2 };
 }
 
 /* ---------- board ---------- */
@@ -155,7 +275,7 @@ function drawBoard(g: PartGeometry): Drawing {
 
   return {
     box: prismBox(w, d, h),
-    render: (sk) => {
+    render: (sk, t, color) => {
       const f = prismFaces(0, 0, w, d, 0, h);
       const pads: ReactNode[] = [];
       const count = Math.min(g.headerPins, sk.fine ? 24 : 8);
@@ -171,61 +291,61 @@ function drawBoard(g: PartGeometry): Drawing {
         const railQuad = alongZ
           ? planQuad(rail - padShort * 0.9, -span / 2, rail + padShort * 0.9, span / 2, h)
           : planQuad(-span / 2, rail - padShort * 0.9, span / 2, rail + padShort * 0.9, h);
-        pads.push(
-          <path key="rail" d={poly(railQuad)} fill={g.color} fillOpacity={0.12} stroke="none" />,
-        );
+        pads.push(<path key="rail" d={poly(railQuad)} fill={color} fillOpacity={0.14} stroke="none" />);
         for (let i = 0; i < count; i++) {
           const c = -span / 2 + step * (i + 0.5);
           const quad = alongZ
             ? planQuad(rail - padShort / 2, c - padLong / 2, rail + padShort / 2, c + padLong / 2, h)
             : planQuad(c - padLong / 2, rail - padShort / 2, c + padLong / 2, rail + padShort / 2, h);
-          pads.push(
-            <path key={`p${i}`} d={poly(quad)} fill={g.color} fillOpacity={0.62} stroke="none" />,
-          );
+          pads.push(<path key={`p${i}`} d={poly(quad)} fill={t.top} fillOpacity={0.68} stroke="none" />);
+          if (sk.fine) {
+            // Solder highlight: a bright fleck on each pad.
+            const hlCx = alongZ ? rail - padShort * 0.18 : c - padLong * 0.1;
+            const hlCz = alongZ ? c - padLong * 0.1 : rail - padShort * 0.18;
+            const [hx, hy] = project(hlCx, h, hlCz);
+            pads.push(
+              <circle key={`ph${i}`} cx={n(hx)} cy={n(hy)} r={n(padShort * 0.16)} fill="#ffffff" fillOpacity={0.5} />,
+            );
+          }
         }
       }
 
       // Two component blocks: a squarish chip in the field, and a connector
       // sitting on one end. Both are pushed clear of the header rail.
-      const chip = block(g, sk, {
+      const chipSpec = {
         cx: alongZ ? -w * 0.11 : 0,
         cz: alongZ ? 0 : -d * 0.11,
         w: alongZ ? w * 0.4 : w * 0.22,
         d: alongZ ? d * 0.16 : d * 0.4,
         h: Math.max(h * 0.7, 1.2),
-      });
-      const conn = block(g, sk, {
+      };
+      const connSpec = {
         cx: alongZ ? 0 : -w * 0.5 + w * 0.09,
         cz: alongZ ? -d * 0.5 + d * 0.09 : 0,
         w: alongZ ? w * 0.5 : w * 0.12,
         d: alongZ ? d * 0.12 : d * 0.5,
         h: Math.max(h * 1.1, 1.6),
-      });
+      };
+      const chip = block(sk, h, chipSpec);
+      const conn = block(sk, h, connSpec);
+      let pin1: ReactNode = null;
+      if (sk.fine) {
+        // IC pin-1 dot: a small mark at one corner of the chip's top face.
+        const cf = prismFaces(chipSpec.cx, chipSpec.cz, chipSpec.w, chipSpec.d, h, chipSpec.h);
+        const [px, py] = cf.top[0];
+        pin1 = <circle cx={n(px)} cy={n(py)} r={n(sk.sw * 1.1)} fill="#ffffff" fillOpacity={0.55} />;
+      }
 
       return (
         <>
-          <path
-            d={poly(f.front)}
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE * 0.7}
-            strokeWidth={sk.sw}
-          />
-          <path
-            d={poly(f.side)}
-            fill={g.color}
-            fillOpacity={FACE_SIDE}
-            stroke={g.color}
-            strokeOpacity={EDGE * 0.7}
-            strokeWidth={sk.sw}
-          />
+          <path d={poly(f.front)} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP * 0.7} strokeWidth={sk.sw} />
+          <path d={poly(f.side)} fill={t.side} fillOpacity={FILL_SIDE} stroke={t.edge} strokeOpacity={EDGE_OP * 0.7} strokeWidth={sk.sw} />
           <path
             d={roundedPoly(f.top, Math.min(w, d) * 0.1)}
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
+            fill={t.top}
+            fillOpacity={FILL_TOP}
+            stroke={t.edge}
+            strokeOpacity={EDGE_OP}
             strokeWidth={sk.sw}
             strokeLinejoin="round"
           />
@@ -244,6 +364,7 @@ function drawBoard(g: PartGeometry): Drawing {
           )}
           {pads}
           {chip}
+          {pin1}
           {conn}
         </>
       );
@@ -251,21 +372,17 @@ function drawBoard(g: PartGeometry): Drawing {
   };
 }
 
-/** A small extruded block standing on a body's top face. */
-function block(
-  g: PartGeometry,
-  sk: Skin,
-  b: { cx: number; cz: number; w: number; d: number; h: number },
-): ReactNode {
-  const f = prismFaces(b.cx, b.cz, b.w, b.d, g.h, b.h);
+/** A small extruded block standing on a body's top face at height y0. */
+function block(sk: Skin, y0: number, b: { cx: number; cz: number; w: number; d: number; h: number }): ReactNode {
+  const f = prismFaces(b.cx, b.cz, b.w, b.d, y0, b.h);
   return (
     <>
-      <path d={poly(f.front)} fill="currentColor" fillOpacity={0.12} stroke="none" />
-      <path d={poly(f.side)} fill="currentColor" fillOpacity={0.08} stroke="none" />
+      <path d={poly(f.front)} fill="currentColor" fillOpacity={0.14} stroke="none" />
+      <path d={poly(f.side)} fill="currentColor" fillOpacity={0.09} stroke="none" />
       <path
         d={poly(f.top)}
         fill="currentColor"
-        fillOpacity={0.2}
+        fillOpacity={0.22}
         stroke="currentColor"
         strokeOpacity={MARK}
         strokeWidth={sk.sw * 0.8}
@@ -281,7 +398,7 @@ function drawPlate(g: PartGeometry): Drawing {
   const { w, h, d } = g;
   return {
     box: prismBox(w, d, h),
-    render: (sk) => {
+    render: (sk, t, color) => {
       const f = prismFaces(0, 0, w, d, 0, h);
       const inner: ReactNode[] = [];
       const alongZ = d >= w;
@@ -307,8 +424,8 @@ function drawPlate(g: PartGeometry): Drawing {
               <path
                 key={`c${r}-${c}`}
                 d={poly(quad)}
-                fill={g.color}
-                fillOpacity={0.3}
+                fill={t.top}
+                fillOpacity={0.4}
                 stroke="currentColor"
                 strokeOpacity={MARK * 0.5}
                 strokeWidth={sk.sw * 0.6}
@@ -318,30 +435,34 @@ function drawPlate(g: PartGeometry): Drawing {
         }
       } else {
         // Active area: screens and blank panels get one inset window.
-        const quad = planQuad(
-          -w / 2 + w * 0.14,
-          -d / 2 + d * 0.14,
-          w / 2 - w * 0.14,
-          d / 2 - d * 0.14,
-          h,
-        );
+        const quad = planQuad(-w / 2 + w * 0.14, -d / 2 + d * 0.14, w / 2 - w * 0.14, d / 2 - d * 0.14, h);
         inner.push(
           <path
             key="window"
             d={roundedPoly(quad, Math.min(w, d) * 0.05)}
-            fill={g.color}
-            fillOpacity={0.14}
-            stroke={g.color}
-            strokeOpacity={EDGE * 0.6}
+            fill={t.side}
+            fillOpacity={0.5}
+            stroke={t.edge}
+            strokeOpacity={EDGE_OP * 0.6}
             strokeWidth={sk.sw * 0.8}
             strokeLinejoin="round"
           />,
         );
         if (sk.fine) {
+          // Sheen: a soft diagonal highlight across the active area, the
+          // way glass or a coated panel catches the overhead light.
+          inner.push(
+            <path
+              key="sheen"
+              d={roundedPoly(quad, Math.min(w, d) * 0.05)}
+              fill={`url(#${sk.uid}-sheen)`}
+              stroke="none"
+            />,
+          );
           for (let i = 0; i < 3; i++) {
-            const t = -d / 2 + d * (0.3 + i * 0.2);
-            const [ax, ay] = project(-w / 2 + w * 0.22, h, t);
-            const [bx, by] = project(w / 2 - w * (i === 2 ? 0.42 : 0.22), h, t);
+            const zt = -d / 2 + d * (0.3 + i * 0.2);
+            const [ax, ay] = project(-w / 2 + w * 0.22, h, zt);
+            const [bx, by] = project(w / 2 - w * (i === 2 ? 0.42 : 0.22), h, zt);
             inner.push(
               <line
                 key={`s${i}`}
@@ -360,31 +481,31 @@ function drawPlate(g: PartGeometry): Drawing {
 
       return (
         <>
-          <path
-            d={poly(f.front)}
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE * 0.7}
-            strokeWidth={sk.sw}
-          />
-          <path
-            d={poly(f.side)}
-            fill={g.color}
-            fillOpacity={FACE_SIDE}
-            stroke={g.color}
-            strokeOpacity={EDGE * 0.7}
-            strokeWidth={sk.sw}
-          />
+          <path d={poly(f.front)} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP * 0.7} strokeWidth={sk.sw} />
+          <path d={poly(f.side)} fill={t.side} fillOpacity={FILL_SIDE} stroke={t.edge} strokeOpacity={EDGE_OP * 0.7} strokeWidth={sk.sw} />
           <path
             d={roundedPoly(f.top, Math.min(w, d) * 0.07)}
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
+            fill={t.top}
+            fillOpacity={FILL_TOP}
+            stroke={t.edge}
+            strokeOpacity={EDGE_OP}
             strokeWidth={sk.sw}
             strokeLinejoin="round"
           />
+          {sk.fine && (
+            // Bezel: a thin inset lip around the whole face.
+            <path
+              d={roundedPoly(
+                planQuad(-w / 2 + w * 0.05, -d / 2 + d * 0.05, w / 2 - w * 0.05, d / 2 - d * 0.05, h),
+                Math.min(w, d) * 0.05,
+              )}
+              fill="none"
+              stroke={t.edge}
+              strokeOpacity={0.3}
+              strokeWidth={sk.sw * 0.6}
+              strokeLinejoin="round"
+            />
+          )}
           {inner}
         </>
       );
@@ -398,12 +519,12 @@ function drawBox(g: PartGeometry): Drawing {
   const { w, h, d } = g;
   return {
     box: prismBox(w, d, h),
-    render: (sk) => {
+    render: (sk, t, color) => {
       const f = prismFaces(0, 0, w, d, 0, h);
       const marks: ReactNode[] = [];
 
       if (g.detail > 0) {
-        // Vents cut into the front face.
+        // Vents cut into the front face, ribbed.
         const span = w * 0.5;
         const step = span / g.detail;
         for (let i = 0; i < g.detail; i++) {
@@ -411,17 +532,7 @@ function drawBox(g: PartGeometry): Drawing {
           const [ax, ay] = project(x, h * 0.68, -d / 2);
           const [bx, by] = project(x, h * 0.24, -d / 2);
           marks.push(
-            <line
-              key={`v${i}`}
-              x1={n(ax)}
-              y1={n(ay)}
-              x2={n(bx)}
-              y2={n(by)}
-              stroke="currentColor"
-              strokeOpacity={MARK}
-              strokeWidth={sk.sw * 1.1}
-              strokeLinecap="round"
-            />,
+            <line key={`v${i}`} x1={n(ax)} y1={n(ay)} x2={n(bx)} y2={n(by)} stroke="currentColor" strokeOpacity={MARK} strokeWidth={sk.sw * 1.1} strokeLinecap="round" />,
           );
         }
       }
@@ -442,37 +553,29 @@ function drawBox(g: PartGeometry): Drawing {
             strokeLinejoin="round"
           />,
         );
+        // Edge highlight: the top-front edge catches the overhead light.
+        const [ex0, ey0] = f.top[0];
+        const [ex1, ey1] = f.top[1];
+        marks.push(
+          <line
+            key="edge"
+            x1={n(ex0)}
+            y1={n(ey0)}
+            x2={n(ex1)}
+            y2={n(ey1)}
+            stroke={t.edge}
+            strokeOpacity={0.65}
+            strokeWidth={sk.sw * 0.8}
+            strokeLinecap="round"
+          />,
+        );
       }
 
       return (
         <>
-          <path
-            d={poly(f.front)}
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-            strokeLinejoin="round"
-          />
-          <path
-            d={poly(f.side)}
-            fill={g.color}
-            fillOpacity={FACE_SIDE}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-            strokeLinejoin="round"
-          />
-          <path
-            d={poly(f.top)}
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-            strokeLinejoin="round"
-          />
+          <path d={poly(f.front)} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} strokeLinejoin="round" />
+          <path d={poly(f.side)} fill={t.side} fillOpacity={FILL_SIDE} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} strokeLinejoin="round" />
+          <path d={poly(f.top)} fill={t.top} fillOpacity={FILL_TOP} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} strokeLinejoin="round" />
           {marks}
         </>
       );
@@ -485,77 +588,34 @@ function drawBox(g: PartGeometry): Drawing {
 function drawCylinder(g: PartGeometry): Drawing {
   const { dia, len } = roundAxis(g);
   const r = dia / 2;
-  const ry = r * ELLIPSE_K;
   const stubH = Math.max(len * 0.12, r * 0.35);
   const stubR = Math.max(r * 0.24, 0.6);
-  const stubRy = stubR * ELLIPSE_K;
-  const yTop = -len;
-  const yStub = yTop - stubH;
+  const box = prismBox(dia, dia, len);
 
   return {
-    box: { x0: -r, y0: yStub - stubRy, x1: r, y1: ry },
-    render: (sk) => {
-      // Barrel: down the left wall, under the front of the base, up the right
-      // wall, then back across the front of the cap.
-      const barrel =
-        `M${n(-r)},${n(yTop)} L${n(-r)},0 ` +
-        `A${n(r)},${n(ry)} 0 0 0 ${n(r)},0 ` +
-        `L${n(r)},${n(yTop)} ` +
-        `A${n(r)},${n(ry)} 0 0 1 ${n(-r)},${n(yTop)} Z`;
-      const seamY = yTop + len * 0.18;
+    box: { ...box, y0: box.y0 - stubH - stubR * DEPTH_Y },
+    render: (sk, t, color) => {
+      const steps = sk.fine ? 12 : 6;
+      const barrel = bandOutline(0, 0, r, 0, len, steps);
+      const stub = bandOutline(0, 0, stubR, len, len + stubH, Math.max(6, steps - 4));
+      const [topCx, topCy] = project(0, len, 0);
+      const [stubCx, stubCy] = project(0, len + stubH, 0);
+
       return (
         <>
-          <path
-            d={barrel}
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
-          <ellipse
-            cx={0}
-            cy={n(yTop)}
-            rx={n(r)}
-            ry={n(ry)}
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
+          <path d={barrel} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} strokeLinejoin="round" />
+          <ellipse cx={0} cy={0} rx={n(r)} ry={n(r)} transform={circleTransform(0, len, 0)} fill={t.top} fillOpacity={FILL_TOP} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} />
           {/* Terminal stub / output shaft, standing on the cap. */}
-          <path
-            d={
-              `M${n(-stubR)},${n(yTop)} L${n(-stubR)},${n(yStub)} ` +
-              `A${n(stubR)},${n(stubRy)} 0 0 1 ${n(stubR)},${n(yStub)} ` +
-              `L${n(stubR)},${n(yTop)} Z`
-            }
-            fill={g.color}
-            fillOpacity={FACE_SIDE + FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw * 0.9}
-          />
-          <ellipse
-            cx={0}
-            cy={n(yStub)}
-            rx={n(stubR)}
-            ry={n(stubRy)}
-            fill={g.color}
-            fillOpacity={0.42}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw * 0.9}
-          />
+          <path d={stub} fill={t.side} fillOpacity={0.62} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw * 0.9} />
+          <ellipse cx={0} cy={0} rx={n(stubR)} ry={n(stubR)} transform={circleTransform(0, len + stubH, 0)} fill={t.top} fillOpacity={0.55} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw * 0.9} />
           {sk.fine && (
-            <path
-              d={`M${n(-r)},${n(seamY)} A${n(r)},${n(ry)} 0 0 0 ${n(r)},${n(seamY)}`}
-              fill="none"
-              stroke="currentColor"
-              strokeOpacity={MARK * 0.7}
-              strokeWidth={sk.sw * 0.7}
-            />
+            <>
+              {/* End-cap highlight ring, inset from the rim. */}
+              <ellipse cx={0} cy={0} rx={n(r * 0.72)} ry={n(r * 0.72)} transform={circleTransform(0, len, 0)} fill="none" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={sk.sw * 0.6} />
+              {/* Terminal contact dot. */}
+              <circle cx={n(stubCx)} cy={n(stubCy)} r={n(stubR * 0.3)} fill="#ffffff" fillOpacity={0.5} />
+              <path d={`M${n(-r)},${n(-len + len * 0.18)} A${n(r)},${n(r * 0.5)} 0 0 0 ${n(r)},${n(-len + len * 0.18)}`} fill="none" stroke="currentColor" strokeOpacity={MARK * 0.35} strokeWidth={sk.sw * 0.6} />
+            </>
           )}
         </>
       );
@@ -568,26 +628,38 @@ function drawCylinder(g: PartGeometry): Drawing {
 function drawDome(g: PartGeometry): Drawing {
   const { dia } = roundAxis(g);
   const r = dia / 2;
-  const ry = r * ELLIPSE_K;
   const flangeR = r * 1.12;
-  const flangeRy = flangeR * ELLIPSE_K;
   const flangeH = r * 0.34;
   const legs = r * 1.25;
+  const box = prismBox(flangeR * 2, flangeR * 2, flangeH + r);
 
   return {
-    box: { x0: -flangeR, y0: -flangeH - r, x1: flangeR, y1: legs },
-    render: (sk) => {
-      const yF = -flangeH;
+    box: { x0: box.x0, y0: box.y0 - r * 0.3, x1: box.x1, y1: legs },
+    render: (sk, t, color) => {
+      const steps = sk.fine ? 12 : 6;
+      const collar = collarOutline(0, 0, flangeR, 0, flangeH, steps);
+
+      const lTop = tangent(0, flangeH, 0, r, -1);
+      const rTop = tangent(0, flangeH, 0, r, 1);
+      const rim = frontRim(0, flangeH, 0, r, steps);
+      const bulge =
+        `M${n(lTop[0])},${n(lTop[1])} A${n(r)},${n(r)} 0 0 1 ${n(rTop[0])},${n(rTop[1])} ` +
+        rim
+          .slice(0, -1)
+          .reverse()
+          .map(([x, y]) => `L${n(x)},${n(y)}`)
+          .join(" ") +
+        " Z";
+
+      const [specCx, specCy] = project(-r * 0.32, flangeH + r * 0.42, -r * 0.28);
+
       return (
         <>
           {/* Legs. */}
           {[-1, 1].map((s) => (
             <path
               key={`leg${s}`}
-              d={
-                `M${n(s * r * 0.42)},${n(yF + flangeH * 0.4)} ` +
-                `L${n(s * r * 0.42)},${n(legs * (s < 0 ? 1 : 0.72))}`
-              }
+              d={`M${n(s * r * 0.42)},${n(-flangeH * 0.6)} L${n(s * r * 0.42)},${n(legs * (s < 0 ? 1 : 0.72))}`}
               stroke="currentColor"
               strokeOpacity={MARK * 1.2}
               strokeWidth={sk.sw * 1.2}
@@ -595,44 +667,11 @@ function drawDome(g: PartGeometry): Drawing {
               fill="none"
             />
           ))}
-          {/* Flange. */}
-          <path
-            d={
-              `M${n(-flangeR)},${n(yF)} L${n(-flangeR)},0 ` +
-              `A${n(flangeR)},${n(flangeRy)} 0 0 0 ${n(flangeR)},0 ` +
-              `L${n(flangeR)},${n(yF)} ` +
-              `A${n(flangeR)},${n(flangeRy)} 0 0 1 ${n(-flangeR)},${n(yF)} Z`
-            }
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
+          {/* Flange / collar. */}
+          <path d={collar} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} />
           {/* Hemisphere. */}
-          <path
-            d={
-              `M${n(-r)},${n(yF)} A${n(r)},${n(r)} 0 0 1 ${n(r)},${n(yF)} ` +
-              `A${n(r)},${n(ry)} 0 0 1 ${n(-r)},${n(yF)} Z`
-            }
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
-          {sk.fine && (
-            <path
-              d={`M${n(-r * 0.55)},${n(yF - r * 0.36)} A${n(r * 0.6)},${n(r * 0.6)} 0 0 1 ${n(
-                -r * 0.1,
-              )},${n(yF - r * 0.8)}`}
-              fill="none"
-              stroke="currentColor"
-              strokeOpacity={MARK}
-              strokeWidth={sk.sw * 0.8}
-              strokeLinecap="round"
-            />
-          )}
+          <path d={bulge} fill={t.top} fillOpacity={FILL_TOP} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} />
+          {sk.fine && <circle cx={n(specCx)} cy={n(specCy)} r={n(r * 0.14)} fill="#ffffff" fillOpacity={0.75} />}
         </>
       );
     },
@@ -644,38 +683,38 @@ function drawDome(g: PartGeometry): Drawing {
 function drawFastener(g: PartGeometry): Drawing {
   const { dia, len } = roundAxis(g);
   const r = dia / 2;
-  const ry = r * ELLIPSE_K;
   const headH = Math.max(len * 0.28, r * 0.7);
   const shaftR = r * 0.56;
   const yHead = -len;
   const yShoulder = yHead + headH;
   const tip = len * 0.14;
+  const box = prismBox(dia, dia, len);
 
   return {
-    box: { x0: -r, y0: yHead - ry, x1: r, y1: 0 },
-    render: (sk) => {
+    box: { ...box, y1: 0 },
+    render: (sk, t, color) => {
+      const steps = sk.fine ? 12 : 6;
+      const headLocalTop = len;
+      const headLocalShoulder = len - headH;
+      const headBand = bandOutline(0, 0, r, headLocalShoulder, headLocalTop, steps);
+
       const ticks: ReactNode[] = [];
       const threadTop = yShoulder + (0 - yShoulder) * 0.22;
       const threadSpan = 0 - tip - threadTop;
       for (let i = 0; i < 4; i++) {
         const y = threadTop + (threadSpan / 4) * (i + 0.5);
         ticks.push(
-          <path
-            key={`t${i}`}
-            d={`M${n(-shaftR)},${n(y - threadSpan * 0.06)} L${n(shaftR)},${n(y + threadSpan * 0.06)}`}
-            stroke="currentColor"
-            strokeOpacity={MARK}
-            strokeWidth={sk.sw * 0.8}
-            strokeLinecap="round"
-          />,
+          <path key={`t${i}`} d={`M${n(-shaftR)},${n(y - threadSpan * 0.06)} L${n(shaftR)},${n(y + threadSpan * 0.06)}`} stroke="currentColor" strokeOpacity={MARK} strokeWidth={sk.sw * 0.8} strokeLinecap="round" />,
         );
       }
-      // Socket: a hexagon squashed into the head's top ellipse.
+      // Socket: a hexagon on the head's top plane, projected exactly like
+      // every other plan point — no separate squash factor to keep in sync.
       const hex: Pt[] = [];
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i + Math.PI / 6;
-        hex.push([r * 0.5 * Math.cos(a), yHead + r * 0.5 * ELLIPSE_K * Math.sin(a)]);
+        hex.push(project(r * 0.5 * Math.cos(a), len, r * 0.5 * Math.sin(a)));
       }
+      const [hcx, hcy] = project(0, len, 0);
 
       return (
         <>
@@ -686,48 +725,20 @@ function drawFastener(g: PartGeometry): Drawing {
               `L${n(-shaftR * 0.45)},0 L${n(shaftR * 0.45)},0 ` +
               `L${n(shaftR)},${n(-tip)} L${n(shaftR)},${n(yShoulder)} Z`
             }
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE}
+            fill={t.front}
+            fillOpacity={FILL_FRONT}
+            stroke={t.edge}
+            strokeOpacity={EDGE_OP}
             strokeWidth={sk.sw}
             strokeLinejoin="round"
           />
           {ticks}
           {/* Head. */}
-          <path
-            d={
-              `M${n(-r)},${n(yHead)} L${n(-r)},${n(yShoulder)} ` +
-              `A${n(r)},${n(ry)} 0 0 0 ${n(r)},${n(yShoulder)} ` +
-              `L${n(r)},${n(yHead)} ` +
-              `A${n(r)},${n(ry)} 0 0 1 ${n(-r)},${n(yHead)} Z`
-            }
-            fill={g.color}
-            fillOpacity={FACE_FRONT}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
-          <ellipse
-            cx={0}
-            cy={n(yHead)}
-            rx={n(r)}
-            ry={n(ry)}
-            fill={g.color}
-            fillOpacity={FACE_TOP}
-            stroke={g.color}
-            strokeOpacity={EDGE}
-            strokeWidth={sk.sw}
-          />
-          <path
-            d={poly(hex)}
-            fill="currentColor"
-            fillOpacity={0.16}
-            stroke="currentColor"
-            strokeOpacity={MARK}
-            strokeWidth={sk.sw * 0.7}
-            strokeLinejoin="round"
-          />
+          <path d={headBand} fill={t.front} fillOpacity={FILL_FRONT} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} />
+          <ellipse cx={0} cy={0} rx={n(r)} ry={n(r)} transform={circleTransform(0, len, 0)} fill={t.top} fillOpacity={FILL_TOP} stroke={t.edge} strokeOpacity={EDGE_OP} strokeWidth={sk.sw} />
+          {/* Socket recess: darkened below the lit top, deep enough to read as a hole. */}
+          <path d={poly(hex)} fill={t.side} fillOpacity={0.85} stroke={t.edge} strokeOpacity={MARK} strokeWidth={sk.sw * 0.7} strokeLinejoin="round" />
+          {sk.fine && <circle cx={n(hcx)} cy={n(hcy)} r={n(r * 0.12)} fill="#000000" fillOpacity={0.4} />}
         </>
       );
     },
@@ -753,6 +764,13 @@ function drawingFor(g: PartGeometry): Drawing {
   }
 }
 
+/** Turn an id into something safe (and unique-enough) for an SVG `<defs>` id:
+ *  the part's own id plus the rendered size, so the same part drawn twice at
+ *  two sizes on one page — a thumbnail and a detail view — never collide. */
+function sanitizeId(part: Part, size: number): string {
+  return `pa-${part.id.replace(/[^A-Za-z0-9_-]/g, "-")}-${size}`;
+}
+
 export interface PartArtProps {
   part: Part;
   /** Rendered edge length in px. Also gates how much fine detail is drawn. */
@@ -776,24 +794,43 @@ export function PartArt({ part, size = 48, className }: PartArtProps) {
   const tx = VIEW / 2 - (scale * (drawing.box.x0 + drawing.box.x1)) / 2;
   const ty = VIEW / 2 - (scale * (drawing.box.y0 + drawing.box.y1)) / 2;
 
+  const uid = sanitizeId(part, size);
   const skin: Skin = {
     // Strokes are specified in viewBox units, then divided back out of the
     // fit transform so a screw and an enclosure carry the same line weight.
     sw: Math.min(2.6, Math.max(0.9, 120 / size)) / scale,
     fine: size >= 56,
+    uid,
   };
+  const t = tones(g.color);
+  const shadow = shadowFootprint(g);
+  const shadowScale = 1.18;
 
   return (
-    <svg
-      viewBox={`0 0 ${VIEW} ${VIEW}`}
-      width={size}
-      height={size}
-      role="img"
-      aria-label={part.name}
-      className={className}
-    >
+    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} width={size} height={size} role="img" aria-label={part.name} className={className}>
+      <defs>
+        <radialGradient id={`${uid}-shadow`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#000000" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+        </radialGradient>
+        {skin.fine && g.shape === "plate" && (
+          <linearGradient id={`${uid}-sheen`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
+            <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+        )}
+      </defs>
       <g transform={`translate(${n(tx)} ${n(ty)}) scale(${n(scale)})`} aria-hidden="true">
-        {drawing.render(skin)}
+        <ellipse
+          cx={0}
+          cy={0}
+          rx={n(shadow.rx * shadowScale)}
+          ry={n(shadow.rz * shadowScale)}
+          transform={circleTransform(0, 0, 0)}
+          fill={`url(#${uid}-shadow)`}
+        />
+        {drawing.render(skin, t, g.color)}
       </g>
     </svg>
   );

@@ -64,37 +64,39 @@ body {
   color: #062019;
 }
 
-/* Uppercase micro-label used across the app */
-.microlabel {
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
+@layer components {
+  /* Uppercase micro-label used across the app */
+  .microlabel {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
 
-/* Drafting-grid backdrop for hero and cover art */
-.blueprint-grid {
-  background-image:
-    linear-gradient(rgba(61, 219, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61, 219, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(rgba(61, 219, 180, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61, 219, 180, 0.03) 1px, transparent 1px);
-  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
-}
+  /* Drafting-grid backdrop for hero and cover art */
+  .blueprint-grid {
+    background-image:
+      linear-gradient(rgba(61, 219, 180, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61, 219, 180, 0.05) 1px, transparent 1px),
+      linear-gradient(rgba(61, 219, 180, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61, 219, 180, 0.03) 1px, transparent 1px);
+    background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+  }
 
-/* Category chip */
-.cat-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border: 1px solid color-mix(in srgb, var(--chip-color, var(--text-dim)) 35%, transparent);
-  color: var(--chip-color, var(--text-dim));
-  background: color-mix(in srgb, var(--chip-color, var(--text-dim)) 10%, transparent);
+  /* Category chip */
+  .cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid color-mix(in srgb, var(--chip-color, var(--text-dim)) 35%, transparent);
+    color: var(--chip-color, var(--text-dim));
+    background: color-mix(in srgb, var(--chip-color, var(--text-dim)) 10%, transparent);
+  }
 }
 
 /* Thin scrollbars fitting the terminal look */
