@@ -12,6 +12,10 @@ Five phases take an empty repo to a shipped v1: scaffold + schema + seed data fi
 - [x] **Phase 4: Generation & persistence** - prompt → engine → project, localStorage, my projects, star, copy (shipped 2026-08-29)
 - [x] **Phase 5: Verify & ship** - browser walkthrough, fixes, README/license, GitHub + ship notes (shipped 2026-08-29)
 - [x] **Phase 6: Visual views** - part illustrations, 3D assembly viewer with STL export, ARCH block diagram (shipped 2026-08-30)
+- [x] **Phase 7: Post-v1 polish** - MECH nesting, sourcing links, ZIP export (shipped 2026-08-30)
+- [ ] **Phase 8: Visual parity** - render-quality MECH, part art v2, procedural hero shots, CSS layering (issue #7, in flight)
+- [ ] **Phase 9: Workflow parity** - project chat/edits, version history, rename, share links, idea generator, FAQ (issue #8)
+- [ ] **Phase 10: Production hardening** - responsive, metadata, resilience, a11y, tagged v1.0.0 (issue #9)
 
 ## Phase Details
 
