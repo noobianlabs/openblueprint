@@ -229,6 +229,27 @@ If you are adding a view, render it from `DesignPackage` rather than from engine
 output — anything a view needs belongs in the schema, so that both engines and all
 four seeds keep working.
 
+### Automated review
+
+Pull requests are reviewed by [Greptile](https://www.greptile.com), which is free for
+non-commercial MIT-licensed projects like this one. Its configuration lives in
+[`.greptile/`](.greptile/) and is worth reading before you open a PR, because it
+documents the project's non-obvious invariants:
+
+| File | What it holds |
+| --- | --- |
+| `config.json` | Review settings and twelve scoped rules, most written after a real bug shipped |
+| `rules.md` | Prose context: the two commitments, and the traps that have caught contributors |
+| `files.json` | The files the reviewer should read for context, such as the schema and geometry |
+
+The rules encode things a reviewer cannot infer from a diff — that sourcing links must
+stay keyword searches rather than specific products, that the keyless path may never
+require a network call, that a WebGL renderer is shared rather than per-component, and
+that an unlayered class in `globals.css` silently outranks every Tailwind utility.
+
+Nothing about the bot is required to contribute: `npx tsc --noEmit` and `npm run build`
+remain the gate, and the config is inert if you fork without enabling the app.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

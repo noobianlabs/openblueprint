@@ -1,0 +1,86 @@
+{
+  "strictness": 2,
+  "commentTypes": ["syntax", "logic", "style"],
+  "triggerOnUpdates": true,
+  "statusCheck": true,
+  "fixWithAI": true,
+  "ignorePatterns": "package-lock.json\n.next/\ntsconfig.tsbuildinfo\ndocs/screenshots/\n*.stl\n*.zip",
+  "summarySection": { "included": true, "collapsible": false, "defaultOpen": true },
+  "issuesTableSection": { "included": true, "collapsible": true, "defaultOpen": true },
+  "confidenceScoreSection": { "included": true, "collapsible": true, "defaultOpen": false },
+  "sequenceDiagramSection": { "included": false },
+  "instructions": "OpenBlueprint turns a plain-English hardware idea into a buildable design package. Two things matter more than style here: the app must keep working with no API key of any kind, and it must never state something it cannot derive from the design data. Most of the rules below exist because a specific bug shipped once. Prefer concrete, reproducible findings over taste; if a change is merely a different way to write the same thing, skip it.",
+  "rules": [
+    {
+      "id": "no-fabricated-sourcing",
+      "rule": "Part sourcing links must be open keyword searches built from the part name. Never a specific product URL, ASIN, SKU, affiliate or referral parameter, and never a claimed price or stock level. 3D-printed parts get no vendor links at all — they are printed from the STL, not bought.",
+      "scope": ["src/lib/design/sourcing.ts", "src/components/tabs/PartsTab.tsx"],
+      "severity": "high"
+    },
+    {
+      "id": "keyless-default",
+      "rule": "The deterministic local engine is the default and must work with no API key and no network. Anything requiring ANTHROPIC_API_KEY must be strictly opt-in and degrade to the local engine when the key is absent. Never make a network call on a path the keyless default reaches.",
+      "scope": ["src/lib/engine/**", "src/app/api/**"],
+      "severity": "high"
+    },
+    {
+      "id": "honest-output",
+      "rule": "The 3D view is a schematic massing model built from estimated dimensions — never describe it, or the STL it exports, as manufacturing CAD or imply STEP output. Costs are estimates and must stay marked as such. If the engine cannot do something the user asked for, the UI says so plainly rather than producing a plausible-looking guess.",
+      "severity": "high"
+    },
+    {
+      "id": "no-new-dependencies",
+      "rule": "Flag any added runtime dependency. This project deliberately hand-rolls its ZIP writer, STL writer, share-link codec and 3D primitives. A new dependency needs an explicit justification in the PR description.",
+      "scope": ["package.json", "package-lock.json"],
+      "severity": "high"
+    },
+    {
+      "id": "deterministic-rendering",
+      "rule": "Procedural art and geometry must be deterministic: the same part always yields byte-identical output. No Math.random(), no Date.now(), no locale- or timezone-dependent formatting in a render path. Derive per-part variation from a hash of the part id instead.",
+      "scope": ["src/components/art/**", "src/lib/design/geometry.ts", "src/components/tabs/mech/scene.ts"],
+      "severity": "high"
+    },
+    {
+      "id": "webgl-context-budget",
+      "rule": "Browsers cap live WebGL contexts at roughly 8-16. Never create a renderer per component instance — the gallery mounts many cards at once. Renderers are shared at module scope and serviced by a queue, results are cached, and scene objects are disposed after each job. Flag any new WebGLRenderer construction inside a component body or effect.",
+      "scope": ["src/components/art/HeroShot.tsx", "src/components/tabs/mech/**"],
+      "severity": "high"
+    },
+    {
+      "id": "browser-storage-guards",
+      "rule": "Every localStorage read and write must be SSR-safe (typeof window guard) and quota-tolerant (try/catch), and must tolerate malformed or absent stored values. State read from storage must not be used during the first client render in a way that mismatches the server render.",
+      "scope": ["src/lib/store.ts", "src/lib/chat-store.ts", "src/lib/progress.ts"],
+      "severity": "high"
+    },
+    {
+      "id": "binary-format-exactness",
+      "rule": "The STL and ZIP writers emit real binary formats consumed by other tools. Binary STL length must equal 84 + 50 * triangleCount. ZIP entries need correct CRC-32, matching compressed/uncompressed sizes, and correct local-header offsets in the central directory. Flag any change to header layout, offset arithmetic or byte counts that is not obviously correct.",
+      "scope": ["src/lib/design/stl.ts", "src/lib/design/export.ts"],
+      "severity": "high"
+    },
+    {
+      "id": "untrusted-share-payloads",
+      "rule": "A share link's payload is untrusted input from a URL. It must be shape-validated before use and rejected with the typed error, producing a human-readable message — never a crash, a blank page, or a partially rendered design.",
+      "scope": ["src/lib/design/share.ts", "src/app/p/shared/**"],
+      "severity": "high"
+    },
+    {
+      "id": "css-layer-cascade",
+      "rule": "Custom classes in globals.css must be declared inside @layer components. An unlayered class silently outranks every Tailwind utility, which has already caused dead hover states and ignored font sizes. Also flag focus:outline-none paired with focus-visible:outline — in Tailwind v4 that poisons the outline custom property and the focus ring never paints.",
+      "scope": ["src/app/globals.css", "src/components/**"],
+      "severity": "medium"
+    },
+    {
+      "id": "theme-tokens-both-modes",
+      "rule": "Colors come from the CSS custom properties in globals.css, not hard-coded literals, so both themes stay coherent. A color defined only inside a media or [data-theme] block will not apply in the default un-stamped state.",
+      "scope": ["src/**/*.tsx", "src/app/globals.css"],
+      "severity": "medium"
+    },
+    {
+      "id": "no-emoji-in-ui",
+      "rule": "No emoji in UI chrome. This interface uses geometric glyphs (for example the tab icons and tree drawing characters). Prefer characters with default text presentation over ones that render emoji-style on some platforms.",
+      "scope": ["src/**/*.tsx"],
+      "severity": "low"
+    }
+  ]
+}

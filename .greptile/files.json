@@ -1,0 +1,24 @@
+[
+  {
+    "path": "../src/lib/design/schema.ts",
+    "description": "The design package schema every view reads from, plus the cost and part-count helpers. The authority for what a part, connection, assembly node and instruction step are. Read this before judging whether a component is using the data correctly."
+  },
+  {
+    "path": "../src/lib/design/geometry.ts",
+    "description": "Derives physical dimensions, shape class and colour for every part from its category and name. The single source of truth for sizes — the part illustrations, the 3D scene and the STL export all read from it, so a change here moves all three."
+  },
+  {
+    "path": "../src/app/globals.css",
+    "description": "Design tokens for both themes and the custom component classes. Relevant to any styling change: classes here must sit inside @layer components or they silently outrank Tailwind utilities.",
+    "scope": ["src/**/*.tsx", "src/app/globals.css"]
+  },
+  {
+    "path": "../src/lib/design/stl.ts",
+    "description": "Binary STL writer. The format contract is that file length equals 84 + 50 * triangle count; check any change against it.",
+    "scope": ["src/lib/design/**", "src/components/tabs/mech/**"]
+  },
+  {
+    "path": "../README.md",
+    "description": "What the project claims to do and, in the Status and limits section, what it explicitly does not. A PR that changes behaviour described here should update it."
+  }
+]
