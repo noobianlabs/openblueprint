@@ -77,8 +77,11 @@ function WiringCanvas({ record }: { record: ProjectRecord }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-52px)] min-h-[560px] w-full">
-      <div className="relative min-w-0 flex-1 bg-bg-inset">
+    // Same rationale as MechTab: a fixed-width sidebar next to the canvas
+    // only works once there's room for both, so it stacks under the canvas
+    // in normal flow below `lg`.
+    <div className="flex w-full flex-col lg:h-[calc(100vh-52px)] lg:min-h-[560px] lg:flex-row">
+      <div className="relative h-[55vh] min-h-[360px] w-full bg-bg-inset lg:h-auto lg:min-h-0 lg:min-w-0 lg:flex-1">
         <ReactFlow
           nodes={nodes}
           edges={edges}

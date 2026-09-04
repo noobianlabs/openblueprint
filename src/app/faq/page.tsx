@@ -3,7 +3,7 @@ import { Footer } from "@/components/Footer";
 import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "FAQ — OpenBlueprint",
+  title: "FAQ",
   description: "Frequently asked questions about OpenBlueprint hardware design generation.",
 };
 

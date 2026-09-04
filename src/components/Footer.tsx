@@ -7,18 +7,18 @@ export function Footer() {
         <p className="microlabel">
           OpenBlueprint — open-source hardware design · MIT license
         </p>
-        <div className="flex gap-6">
-          <Link href="/about" className="microlabel hover:text-ink">
+        <div className="flex flex-wrap gap-6">
+          <Link href="/about" className="microlabel flex min-h-10 items-center hover:text-ink">
             About
           </Link>
-          <Link href="/faq" className="microlabel hover:text-ink">
+          <Link href="/faq" className="microlabel flex min-h-10 items-center hover:text-ink">
             FAQ
           </Link>
           <a
             href="https://github.com/noobianlabs/openblueprint"
             target="_blank"
             rel="noreferrer"
-            className="microlabel hover:text-ink"
+            className="microlabel flex min-h-10 items-center hover:text-ink"
           >
             GitHub
           </a>

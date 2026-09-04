@@ -414,7 +414,7 @@ export function MechViewer({
 
       {/* Toolbar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 p-3">
-        <div className="pointer-events-auto flex items-center gap-2.5 rounded-sm border border-line bg-bg/80 px-3 py-1.5 backdrop-blur">
+        <div className="pointer-events-auto flex min-h-10 items-center gap-2.5 rounded-sm border border-line bg-bg/80 px-3 py-1.5 backdrop-blur">
           <label htmlFor="explode" className="microlabel text-[10px]">
             Explode
           </label>
@@ -442,19 +442,19 @@ export function MechViewer({
             setExplode(0);
             apiRef.current?.resetView();
           }}
-          className="microlabel pointer-events-auto rounded-sm border border-line bg-bg/80 px-3 py-1.5 text-[10px] backdrop-blur hover:border-line-strong hover:text-ink"
+          className="microlabel pointer-events-auto flex min-h-10 items-center rounded-sm border border-line bg-bg/80 px-3 py-1.5 text-[10px] backdrop-blur hover:border-line-strong hover:text-ink"
         >
           Reset view
         </button>
 
-        <div className="pointer-events-auto flex items-center rounded-sm border border-line bg-bg/80 backdrop-blur">
-          <span className="microlabel border-r border-line px-2.5 py-1.5 text-[10px] text-ink-faint">
+        <div className="pointer-events-auto flex min-h-10 items-stretch rounded-sm border border-line bg-bg/80 backdrop-blur">
+          <span className="microlabel flex items-center border-r border-line px-2.5 py-1.5 text-[10px] text-ink-faint">
             Download STL
           </span>
           <button
             type="button"
             onClick={() => download("assembly")}
-            className="microlabel px-2.5 py-1.5 text-[10px] text-accent hover:bg-bg-raised"
+            className="microlabel flex items-center px-2.5 py-1.5 text-[10px] text-accent hover:bg-bg-raised"
             title="Binary STL of the whole assembly, in millimetres"
           >
             Assembly
@@ -463,7 +463,7 @@ export function MechViewer({
             type="button"
             onClick={() => download("part")}
             disabled={!selectedPlaced}
-            className="microlabel border-l border-line px-2.5 py-1.5 text-[10px] hover:bg-bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="microlabel flex items-center border-l border-line px-2.5 py-1.5 text-[10px] hover:bg-bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
             title={
               selectedPlaced
                 ? `Binary STL of ${selectedPlaced.part.name} alone`
@@ -498,7 +498,11 @@ export function MechViewer({
         </div>
       )}
 
-      <p className="pointer-events-none absolute bottom-4 left-3 max-w-[420px] text-[10px] leading-relaxed text-ink-faint">
+      {/* `right-3` alongside `left-3` keeps this from overflowing the viewport
+          at 375px — `max-w-[420px]` alone only caps the width, it doesn't
+          stop an absolutely-positioned, left-anchored box from running past
+          the right edge and forcing the page to scroll sideways. */}
+      <p className="pointer-events-none absolute bottom-4 left-3 right-3 max-w-[420px] text-[10px] leading-relaxed text-ink-faint">
         Schematic massing model — primitive bodies at estimated sizes, not manufacturing CAD.
         Drag to orbit, scroll to zoom, shift-drag or right-drag to pan.
       </p>

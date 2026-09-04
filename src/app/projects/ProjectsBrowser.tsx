@@ -94,7 +94,7 @@ export function ProjectsBrowser() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="search designs…"
-          className="min-w-48 flex-1 rounded-sm border border-line bg-bg-inset px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-faint focus:border-line-strong"
+          className="min-h-10 min-w-48 flex-1 rounded-sm border border-line bg-bg-inset px-3 py-2 text-[12px] text-ink placeholder:text-ink-faint focus:border-line-strong"
         />
         <div className="flex gap-1">
           {FILTERS.map((f) => (
@@ -102,7 +102,8 @@ export function ProjectsBrowser() {
               key={f.key}
               type="button"
               onClick={() => setFilter(f.key)}
-              className={`microlabel rounded-sm border px-3 py-1.5 transition-colors ${
+              aria-pressed={filter === f.key}
+              className={`microlabel min-h-10 rounded-sm border px-3 transition-colors ${
                 filter === f.key
                   ? "border-line-strong bg-bg-raised text-ink"
                   : "border-line hover:text-ink"
@@ -118,7 +119,8 @@ export function ProjectsBrowser() {
               key={s.key}
               type="button"
               onClick={() => setSort(s.key)}
-              className={`microlabel rounded-sm border px-3 py-1.5 transition-colors ${
+              aria-pressed={sort === s.key}
+              className={`microlabel min-h-10 rounded-sm border px-3 transition-colors ${
                 sort === s.key
                   ? "border-line-strong bg-bg-raised text-ink"
                   : "border-line hover:text-ink"
@@ -146,21 +148,26 @@ export function ProjectsBrowser() {
               {visibleMine.map((project) => (
                 <div key={project.slug} className="group relative">
                   <ProjectCard project={project} />
-                  <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  {/* Always visible on touch (no hover to reveal it there);
+                      desktop keeps the hover/focus reveal so the card stays
+                      clean until you're near it. */}
+                  <div className="absolute top-2 right-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                     {confirming === project.slug ? (
                       <div className="flex items-center gap-2 rounded-sm border border-line-strong bg-bg px-2 py-1">
                         <span className="microlabel text-ink-faint">delete?</span>
                         <button
                           type="button"
                           onClick={() => remove(project.slug)}
-                          className="microlabel text-accent hover:underline"
+                          aria-label={`Confirm delete ${project.pkg.name}`}
+                          className="microlabel min-h-10 px-1 text-accent hover:underline"
                         >
                           yes
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirming(null)}
-                          className="microlabel hover:text-ink"
+                          aria-label="Cancel delete"
+                          className="microlabel min-h-10 px-1 hover:text-ink"
                         >
                           no
                         </button>
@@ -170,7 +177,8 @@ export function ProjectsBrowser() {
                         type="button"
                         onClick={() => setConfirming(project.slug)}
                         title={`Delete ${project.pkg.name}`}
-                        className="rounded-sm border border-line bg-bg px-2 py-1 text-[12px] text-ink-faint hover:border-line-strong hover:text-ink"
+                        aria-label={`Delete ${project.pkg.name}`}
+                        className="flex min-h-10 min-w-10 items-center justify-center rounded-sm border border-line bg-bg text-[12px] text-ink-faint hover:border-line-strong hover:text-ink"
                       >
                         ⌫
                       </button>

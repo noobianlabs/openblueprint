@@ -14,12 +14,12 @@ export function WiringSidebar({
   onSelect: (id: string) => void;
 }) {
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col overflow-y-auto border-l border-line bg-bg">
+    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-bg lg:w-[260px] lg:overflow-y-auto lg:border-t-0 lg:border-l">
       <div className="border-b border-line px-4 py-3">
         <p className="microlabel">Electrical parts</p>
       </div>
 
-      <div className="flex-1 px-4 py-3">
+      <div className="max-h-[40vh] overflow-y-auto px-4 py-3 lg:max-h-none lg:flex-1 lg:overflow-visible">
         {groups.map((group) => {
           const meta = CATEGORY_META[group.category];
           return (
@@ -37,7 +37,7 @@ export function WiringSidebar({
                       type="button"
                       onClick={() => onSelect(part.id)}
                       title={part.name}
-                      className={`flex w-full items-baseline gap-1 rounded-sm px-1 py-[3px] text-left text-[11px] transition-colors ${
+                      className={`flex w-full items-baseline gap-1 rounded-sm px-1 py-1.5 text-left text-[11px] transition-colors ${
                         selectedId === part.id
                           ? "bg-bg-raised text-ink"
                           : "text-ink-dim hover:bg-bg-raised hover:text-ink"

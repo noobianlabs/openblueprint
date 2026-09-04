@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ProjectRecord } from "@/lib/design/schema";
-import { isStarred, makeUserRecord, renameProject, saveProject, toggleStar } from "@/lib/store";
+import {
+  isStarred,
+  lastStorageFailure,
+  makeUserRecord,
+  renameProject,
+  saveProject,
+  toggleStar,
+} from "@/lib/store";
 import { buildProjectZip, exportFilename } from "@/lib/design/export";
 import { shareUrl } from "@/lib/design/share";
 import { InfoTab } from "@/components/tabs/InfoTab";
@@ -14,6 +21,7 @@ import { MechTab } from "@/components/tabs/MechTab";
 import { ArchTab } from "@/components/tabs/ArchTab";
 import { InstructionsTab } from "@/components/tabs/InstructionsTab";
 import { VersionHistory } from "@/components/VersionHistory";
+import { TabBoundary } from "@/components/TabBoundary";
 
 const TABS = [
   { key: "info", label: "Info", icon: "▤" },
@@ -66,6 +74,7 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
   const [nameDraft, setNameDraft] = useState(record.pkg.name);
   const skipBlurRef = useRef(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   /* Star state is browser-local; read it after mount so SSR and the first
      client render agree. */
@@ -143,9 +152,16 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
     }
   }
 
+  /* A copy that could not be written must not navigate: /p/<slug> would
+     resolve to nothing and read as a bug rather than as full storage. */
   function onCopy() {
     const copy = makeUserRecord(shown.pkg, shown.pkg.name);
-    saveProject(copy);
+    const failure = saveProject(copy);
+    if (failure) {
+      setStorageError(failure);
+      return;
+    }
+    setStorageError(null);
     setCopying(true);
     router.push(`/p/${copy.slug}`);
   }
@@ -164,6 +180,7 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
     }
     setProjectName(trimmed);
     renameProject(record.slug, trimmed);
+    setStorageError(lastStorageFailure());
   }
 
   function cancelRename() {
@@ -193,6 +210,8 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* scrollbar-width covers Firefox; this covers WebKit. */}
+      <style>{`.obp-tabbar::-webkit-scrollbar { display: none; }`}</style>
       <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
@@ -227,13 +246,19 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
               </div>
             )}
           </div>
-          <div className="order-3 flex w-full justify-center gap-1 sm:order-none sm:w-auto">
+          {/* Six tabs do not fit at 375px. The row scrolls sideways instead of
+              wrapping; it stays left-aligned while scrollable, because a
+              centred overflowing row clips its first tabs out of reach. */}
+          <div
+            className="obp-tabbar order-3 flex w-full flex-nowrap justify-start gap-1 overflow-x-auto sm:order-none sm:w-auto sm:justify-center"
+            style={{ scrollbarWidth: "none" }}
+          >
             {TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => selectTab(t.key)}
-                className={`microlabel rounded-sm border px-3 py-1.5 transition-colors ${
+                className={`microlabel shrink-0 rounded-sm border px-3 py-1.5 whitespace-nowrap transition-colors ${
                   tab === t.key
                     ? "border-line-strong bg-bg-raised text-ink"
                     : "border-transparent hover:text-ink"
@@ -308,13 +333,57 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
         </div>
       </header>
 
+      {storageError && (
+        <div className="flex items-start justify-between gap-3 border-b border-line bg-bg-inset px-5 py-2">
+          <p className="text-[12px] leading-relaxed text-ink-dim">
+            <span className="microlabel mr-2 text-ink">NOT SAVED</span>
+            {storageError}
+          </p>
+          <button
+            type="button"
+            onClick={() => setStorageError(null)}
+            aria-label="Dismiss storage warning"
+            className="microlabel shrink-0 text-ink-faint hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* One boundary per view, keyed by tab: a design that breaks Mech must
+          not take Parts down with it, and switching away and back gives the
+          failed view a clean mount rather than the boundary's fallback. */}
       <main className="flex-1">
-        {tab === "info" && <InfoTab record={shown} />}
-        {tab === "parts" && <PartsTab record={shown} />}
-        {tab === "arch" && <ArchTab record={shown} />}
-        {tab === "wiring" && <WiringTab record={shown} />}
-        {tab === "mech" && <MechTab record={shown} />}
-        {tab === "instructions" && <InstructionsTab record={shown} />}
+        {tab === "info" && (
+          <TabBoundary key="info" view="Info">
+            <InfoTab record={shown} />
+          </TabBoundary>
+        )}
+        {tab === "parts" && (
+          <TabBoundary key="parts" view="Parts">
+            <PartsTab record={shown} />
+          </TabBoundary>
+        )}
+        {tab === "arch" && (
+          <TabBoundary key="arch" view="Arch">
+            <ArchTab record={shown} />
+          </TabBoundary>
+        )}
+        {tab === "wiring" && (
+          <TabBoundary key="wiring" view="Wiring">
+            <WiringTab record={shown} />
+          </TabBoundary>
+        )}
+        {tab === "mech" && (
+          <TabBoundary key="mech" view="Mech">
+            <MechTab record={shown} />
+          </TabBoundary>
+        )}
+        {tab === "instructions" && (
+          <TabBoundary key="instructions" view="Instructions">
+            <InstructionsTab record={shown} />
+          </TabBoundary>
+        )}
       </main>
     </div>
   );

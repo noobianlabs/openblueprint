@@ -50,7 +50,7 @@ export function AssemblyTree({
               type="button"
               onClick={() => onSelect({ path, partId: node.part })}
               title={part?.name ?? node.part}
-              className={`flex w-full items-center gap-1.5 rounded-sm py-[3px] pr-2 pl-1 text-left text-[11px] transition-colors ${
+              className={`flex w-full items-center gap-1.5 rounded-sm py-1.5 pr-2 pl-1 text-left text-[11px] transition-colors ${
                 active ? "bg-bg-raised text-ink" : "text-ink-dim hover:bg-bg-raised hover:text-ink"
               }`}
             >

@@ -69,6 +69,30 @@ npm run build
 npm start
 ```
 
+## Deploying
+
+The app is a standard Next.js App Router project with no database, no session
+store, and no server-side state — every project lives in the visitor's own
+browser. That makes it deployable anywhere Next.js runs, and it costs nothing
+to keep online.
+
+**Vercel** — import the repository and accept the detected defaults; no build
+configuration is required.
+
+**Any Node host** — `npm ci && npm run build && npm start`, behind whatever
+reverse proxy you already use. The server needs Node 20 or newer.
+
+Two optional environment variables:
+
+| Variable | Effect if unset |
+| --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | OpenGraph and Twitter tags resolve against `http://localhost:3000`, so link previews will be wrong in production. Set it to your real origin, e.g. `https://example.com`. |
+| `ANTHROPIC_API_KEY` | The Claude engine is simply unavailable and the local engine handles every request. Nothing degrades. |
+
+Set neither and the deployment still works completely — that is the point of
+the keyless default. `ANTHROPIC_API_KEY` is read only on the server, inside the
+API routes; it is never exposed to the browser.
+
 ## Two engines
 
 **The local engine is the default and needs no configuration.** It matches your

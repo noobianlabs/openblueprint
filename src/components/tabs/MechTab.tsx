@@ -57,9 +57,12 @@ export function MechTab({ record }: { record: ProjectRecord }) {
   const selectedPart = selection ? partById(pkg, selection.partId) : undefined;
 
   return (
-    <div className="flex h-[calc(100vh-52px)] min-h-[560px] w-full">
+    // Fixed-height side-by-side layout only kicks in at lg — a 300px sidebar
+    // squeezes the 3D canvas to nothing below that, so on narrow screens the
+    // sidebar stacks under the canvas in normal document flow instead.
+    <div className="flex w-full flex-col lg:h-[calc(100vh-52px)] lg:min-h-[560px] lg:flex-row">
       {/* Viewer */}
-      <div className="blueprint-grid relative min-w-0 flex-1 overflow-hidden bg-bg-inset">
+      <div className="blueprint-grid relative h-[55vh] min-h-[360px] w-full shrink-0 overflow-hidden bg-bg-inset lg:h-auto lg:min-h-0 lg:min-w-0 lg:flex-1">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -74,13 +77,13 @@ export function MechTab({ record }: { record: ProjectRecord }) {
       </div>
 
       {/* Sidebar */}
-      <aside className="flex w-[300px] shrink-0 flex-col border-l border-line bg-bg">
+      <aside className="flex w-full shrink-0 flex-col border-t border-line bg-bg lg:w-[300px] lg:border-t-0 lg:border-l">
         <div className="flex items-baseline justify-between gap-2 border-b border-line px-4 py-3">
           <p className="microlabel text-ink">Parts</p>
           <p className="microlabel text-[10px] text-ink-faint">Assembly</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3">
+        <div className="max-h-[45vh] overflow-y-auto px-3 py-3 lg:max-h-none lg:flex-1">
           <AssemblyTree
             pkg={pkg}
             nodes={pkg.assembly}

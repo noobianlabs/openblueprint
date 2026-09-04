@@ -54,13 +54,13 @@ export function PartsTab({ record }: { record: ProjectRecord }) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search parts..."
           aria-label="Search parts"
-          className="min-w-0 flex-1 rounded-sm border border-line bg-bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-faint focus:border-line-strong focus:outline-none"
+          className="min-h-10 min-w-0 flex-1 rounded-sm border border-line bg-bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-faint focus:border-line-strong"
         />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as Filter)}
           aria-label="Filter by category"
-          className="microlabel rounded-sm border border-line bg-bg-inset px-3 py-2 text-ink [color-scheme:dark] focus:border-line-strong focus:outline-none"
+          className="microlabel min-h-10 rounded-sm border border-line bg-bg-inset px-3 py-2 text-ink [color-scheme:dark] focus:border-line-strong"
         >
           <option value="all">All ({pkg.parts.length})</option>
           {present.map(({ category, count }) => (
@@ -71,94 +71,101 @@ export function PartsTab({ record }: { record: ProjectRecord }) {
         </select>
       </div>
 
-      <div className="mt-6 flex items-center gap-3 border-b border-line px-3 pb-2">
-        <span className="microlabel flex-1">Part</span>
-        <span className={`microlabel ${COL_QTY}`}>Qty</span>
-        <span className={`microlabel ${COL_UNIT}`}>Unit</span>
-        <span className={`microlabel ${COL_SUB}`}>Subtotal</span>
-      </div>
+      {/* The qty/unit/subtotal columns are fixed-width and don't have room to
+          squeeze next to the part text below ~540px — scroll horizontally
+          inside this container instead of shrinking the page body. */}
+      <div className="mt-6 overflow-x-auto">
+        <div className="min-w-[540px]">
+          <div className="flex items-center gap-3 border-b border-line px-3 pb-2">
+            <span className="microlabel flex-1">Part</span>
+            <span className={`microlabel ${COL_QTY}`}>Qty</span>
+            <span className={`microlabel ${COL_UNIT}`}>Unit</span>
+            <span className={`microlabel ${COL_SUB}`}>Subtotal</span>
+          </div>
 
-      {visible.length === 0 ? (
-        <p className="microlabel py-16 text-center text-ink-faint">no parts match</p>
-      ) : (
-        <ul>
-          {visible.map((part) => {
-            const meta = CATEGORY_META[part.category];
-            const bought = isSourceable(part);
-            const links = sourcingLinks(part);
-            return (
-              <li
-                key={part.id}
-                className="flex items-start gap-3 border-b border-line px-3 py-3 hover:bg-bg-card"
-              >
-                <PartThumb category={part.category} part={part} size={48} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold">{part.name}</p>
-                  <p className="mt-0.5 text-[12px] text-ink-dim">{part.role}</p>
-                  <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-ink-faint">
-                    {part.description}
-                  </p>
-                  {part.printSettings && (
-                    <p className="mt-1 text-[12px] text-ink-faint">⬡ {part.printSettings}</p>
-                  )}
-                  {/* Approximate body, derived — the package never states sizes. */}
-                  <p className="mt-1 text-[12px] text-ink-faint tabular-nums">
-                    {dimsLabel(geometryFor(part))}
-                  </p>
-                  <span
-                    className="cat-chip mt-2"
-                    style={{ ["--chip-color" as string]: meta.color }}
+          {visible.length === 0 ? (
+            <p className="microlabel py-16 text-center text-ink-faint">no parts match</p>
+          ) : (
+            <ul>
+              {visible.map((part) => {
+                const meta = CATEGORY_META[part.category];
+                const bought = isSourceable(part);
+                const links = sourcingLinks(part);
+                return (
+                  <li
+                    key={part.id}
+                    className="flex items-start gap-3 border-b border-line px-3 py-3 hover:bg-bg-card"
                   >
-                    {meta.label}
-                  </span>
+                    <PartThumb category={part.category} part={part} size={48} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold">{part.name}</p>
+                      <p className="mt-0.5 text-[12px] text-ink-dim">{part.role}</p>
+                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-ink-faint">
+                        {part.description}
+                      </p>
+                      {part.printSettings && (
+                        <p className="mt-1 text-[12px] text-ink-faint">⬡ {part.printSettings}</p>
+                      )}
+                      {/* Approximate body, derived — the package never states sizes. */}
+                      <p className="mt-1 text-[12px] text-ink-faint tabular-nums">
+                        {dimsLabel(geometryFor(part))}
+                      </p>
+                      <span
+                        className="cat-chip mt-2"
+                        style={{ ["--chip-color" as string]: meta.color }}
+                      >
+                        {meta.label}
+                      </span>
 
-                  {/* Sourcing: keyword searches only — see lib/design/sourcing.ts. */}
-                  {!bought ? (
-                    <p className="mt-2 text-[12px] text-ink-faint">{PRINTED_PART_NOTE}</p>
-                  ) : links.length > 0 ? (
-                    <details className="group mt-2">
-                      {/* Hand-rolled instead of `.microlabel`, which is unlayered
-                          and would beat the hover colour. */}
-                      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-[11px] uppercase tracking-[0.12em] text-ink-faint hover:text-ink-dim focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-                        <span
-                          aria-hidden="true"
-                          className="inline-block transition-transform group-open:rotate-90"
-                        >
-                          ▸
-                        </span>
-                        Search for this part
-                      </summary>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {links.map((link) => (
-                          <a
-                            key={link.vendor}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={link.description}
-                            aria-label={link.description}
-                            className="rounded-sm text-[12px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                          >
-                            {link.label}
-                          </a>
-                        ))}
-                        <span className="text-[11px] text-ink-faint">
-                          {SOURCING_DISCLAIMER}
-                        </span>
-                      </div>
-                    </details>
-                  ) : null}
-                </div>
-                <span className={`${COL_QTY} text-[13px]`}>{part.qty}</span>
-                <span className={`${COL_UNIT} text-[13px] text-ink-dim`}>
-                  {fmtCost(part.unitCost)}
-                </span>
-                <span className={`${COL_SUB} text-[13px]`}>{fmtCost(subtotal(part))}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                      {/* Sourcing: keyword searches only — see lib/design/sourcing.ts. */}
+                      {!bought ? (
+                        <p className="mt-2 text-[12px] text-ink-faint">{PRINTED_PART_NOTE}</p>
+                      ) : links.length > 0 ? (
+                        <details className="group mt-2">
+                          {/* Hand-rolled instead of `.microlabel`, which is unlayered
+                              and would beat the hover colour. */}
+                          <summary className="inline-flex min-h-10 cursor-pointer list-none items-center gap-1.5 rounded-sm py-2 text-[11px] uppercase tracking-[0.12em] text-ink-faint hover:text-ink-dim focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                            <span
+                              aria-hidden="true"
+                              className="inline-block transition-transform group-open:rotate-90"
+                            >
+                              ▸
+                            </span>
+                            Search for this part
+                          </summary>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            {links.map((link) => (
+                              <a
+                                key={link.vendor}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={link.description}
+                                aria-label={link.description}
+                                className="inline-block rounded-sm py-1 text-[12px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                              >
+                                {link.label}
+                              </a>
+                            ))}
+                            <span className="text-[11px] text-ink-faint">
+                              {SOURCING_DISCLAIMER}
+                            </span>
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                    <span className={`${COL_QTY} text-[13px]`}>{part.qty}</span>
+                    <span className={`${COL_UNIT} text-[13px] text-ink-dim`}>
+                      {fmtCost(part.unitCost)}
+                    </span>
+                    <span className={`${COL_SUB} text-[13px]`}>{fmtCost(subtotal(part))}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
 
       <div className="sticky bottom-0 mt-4 flex items-center justify-between border-t border-line-strong bg-bg/95 px-3 py-3 backdrop-blur">
         <span className="microlabel">Total estimated cost</span>

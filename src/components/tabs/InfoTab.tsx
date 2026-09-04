@@ -66,61 +66,67 @@ export function InfoTab({ record }: { record: ProjectRecord }) {
       <h1 className="mt-10 text-xl font-extrabold tracking-[0.1em] uppercase">{pkg.name}</h1>
       <p className="microlabel mt-1 text-ink-faint">by {record.author}</p>
 
-      {/* BOM rollup: domain → category → parts */}
+      {/* BOM rollup: domain → category → parts. The two fixed-width numeric
+          columns don't shrink, so on very narrow viewports this scrolls
+          inside its own container rather than squeezing the category name. */}
       <section className="mt-6 overflow-hidden rounded-md border border-line bg-bg-card">
-        <div className="flex items-center gap-3 border-b border-line px-4 py-2">
-          <span className="microlabel flex-1">Category</span>
-          <span className={`microlabel ${COL_PARTS}`}>Parts</span>
-          <span className={`microlabel ${COL_COST}`}>Cost</span>
-        </div>
-
-        {groups.map((group) => (
-          <div key={group.domain}>
-            <div className="flex items-center gap-3 border-b border-line bg-bg-raised px-4 py-2 text-[12px] font-bold tracking-[0.08em] uppercase">
-              <span className="flex-1">{group.domain}</span>
-              <span className={COL_PARTS}>{group.lineCount}</span>
-              <span className={COL_COST}>{fmtCost(group.cost)}</span>
+        <div className="overflow-x-auto">
+          <div className="min-w-[460px]">
+            <div className="flex items-center gap-3 border-b border-line px-4 py-2">
+              <span className="microlabel flex-1">Category</span>
+              <span className={`microlabel ${COL_PARTS}`}>Parts</span>
+              <span className={`microlabel ${COL_COST}`}>Cost</span>
             </div>
 
-            {group.categories.map((cat) => {
-              const meta = CATEGORY_META[cat.category];
-              const isOpen = !collapsed.has(cat.category);
-              return (
-                <div key={cat.category}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(cat.category)}
-                    aria-expanded={isOpen}
-                    className="flex w-full items-center gap-3 border-b border-line px-4 py-2 text-left text-[12px] hover:bg-bg-raised"
-                    style={{ color: meta.color }}
-                  >
-                    <span className="w-3 shrink-0 text-ink-faint">{isOpen ? "▾" : "▸"}</span>
-                    <span className="flex-1 tracking-[0.08em] uppercase">{meta.label}</span>
-                    <span className={COL_PARTS}>{cat.lineCount}</span>
-                    <span className={COL_COST}>{fmtCost(cat.cost)}</span>
-                  </button>
-
-                  {isOpen &&
-                    cat.parts.map((part) => (
-                      <div
-                        key={part.id}
-                        className="flex items-center gap-3 border-b border-line py-1.5 pr-4 pl-10 text-[12px] text-ink-dim"
-                      >
-                        <span className="flex-1 truncate">{part.name}</span>
-                        <span className={COL_PARTS}>{part.qty}</span>
-                        <span className={COL_COST}>{fmtCost(subtotal(part))}</span>
-                      </div>
-                    ))}
+            {groups.map((group) => (
+              <div key={group.domain}>
+                <div className="flex items-center gap-3 border-b border-line bg-bg-raised px-4 py-2 text-[12px] font-bold tracking-[0.08em] uppercase">
+                  <span className="flex-1">{group.domain}</span>
+                  <span className={COL_PARTS}>{group.lineCount}</span>
+                  <span className={COL_COST}>{fmtCost(group.cost)}</span>
                 </div>
-              );
-            })}
-          </div>
-        ))}
 
-        <div className="flex items-center gap-3 px-4 py-2.5 text-[12px] font-bold tracking-[0.08em] uppercase">
-          <span className="flex-1">Total</span>
-          <span className={COL_PARTS}>{partCount(pkg)}</span>
-          <span className={`${COL_COST} text-accent`}>{fmtCost(totalCost(pkg))}</span>
+                {group.categories.map((cat) => {
+                  const meta = CATEGORY_META[cat.category];
+                  const isOpen = !collapsed.has(cat.category);
+                  return (
+                    <div key={cat.category}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(cat.category)}
+                        aria-expanded={isOpen}
+                        className="flex min-h-10 w-full items-center gap-3 border-b border-line px-4 py-2 text-left text-[12px] hover:bg-bg-raised"
+                        style={{ color: meta.color }}
+                      >
+                        <span className="w-3 shrink-0 text-ink-faint">{isOpen ? "▾" : "▸"}</span>
+                        <span className="flex-1 tracking-[0.08em] uppercase">{meta.label}</span>
+                        <span className={COL_PARTS}>{cat.lineCount}</span>
+                        <span className={COL_COST}>{fmtCost(cat.cost)}</span>
+                      </button>
+
+                      {isOpen &&
+                        cat.parts.map((part) => (
+                          <div
+                            key={part.id}
+                            className="flex items-center gap-3 border-b border-line py-1.5 pr-4 pl-10 text-[12px] text-ink-dim"
+                          >
+                            <span className="flex-1 truncate">{part.name}</span>
+                            <span className={COL_PARTS}>{part.qty}</span>
+                            <span className={COL_COST}>{fmtCost(subtotal(part))}</span>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+
+            <div className="flex items-center gap-3 px-4 py-2.5 text-[12px] font-bold tracking-[0.08em] uppercase">
+              <span className="flex-1">Total</span>
+              <span className={COL_PARTS}>{partCount(pkg)}</span>
+              <span className={`${COL_COST} text-accent`}>{fmtCost(totalCost(pkg))}</span>
+            </div>
+          </div>
         </div>
       </section>
     </div>

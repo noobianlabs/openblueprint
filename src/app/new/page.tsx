@@ -1,5 +1,14 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { RunView } from "./RunView";
+
+export const metadata: Metadata = {
+  title: "Generate New Design",
+  description: "Create a hardware design package from a text description.",
+  robots: {
+    index: false,
+  },
+};
 
 /**
  * The generation run screen. RunView reads ?prompt= with useSearchParams,

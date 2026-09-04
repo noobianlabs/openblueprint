@@ -40,13 +40,56 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function writeJson(key: string, value: unknown): void {
+/**
+ * Why the last write failed, or null if it succeeded. Reset on every write,
+ * so a caller that cannot take a return value (see {@link toggleStar}) can
+ * still ask what happened immediately afterwards.
+ */
+let lastFailure: string | null = null;
+
+/** Message describing the most recent storage failure, or null if all is well. */
+export function lastStorageFailure(): string | null {
+  return lastFailure;
+}
+
+const NO_STORAGE_MESSAGE =
+  "This browser is not letting the page store anything — private browsing or blocked site data. The design is on screen but will not be here after a reload.";
+
+const QUOTA_MESSAGE =
+  "This browser's storage for the site is full. Delete a project or two from My Projects and try again.";
+
+const GENERIC_MESSAGE =
+  "This browser refused to save the change, so it will not survive a reload.";
+
+/** Quota exhaustion looks different across browsers; all three spellings occur. */
+function isQuotaError(err: unknown): boolean {
+  if (typeof DOMException !== "undefined" && err instanceof DOMException) {
+    return err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22;
+  }
+  return err instanceof Error && /quota/i.test(err.name + err.message);
+}
+
+/**
+ * Persist a value. Returns null on success, or a human-readable message the
+ * caller can put on screen — silently dropping the write is how a user loses
+ * a design without ever being told.
+ */
+function writeJson(key: string, value: unknown): string | null {
+  // Server render: there is nothing to persist to and nothing to report.
+  if (typeof window === "undefined") return null;
   const store = storage();
-  if (!store) return;
+  if (!store) {
+    lastFailure = NO_STORAGE_MESSAGE;
+    return lastFailure;
+  }
   try {
     store.setItem(key, JSON.stringify(value));
-  } catch {
+    lastFailure = null;
+    return null;
+  } catch (err) {
     // Full or unavailable — the design is still on screen, just not saved.
+    lastFailure = isQuotaError(err) ? QUOTA_MESSAGE : GENERIC_MESSAGE;
+    return lastFailure;
   }
 }
 
@@ -69,23 +112,32 @@ export function getMyProject(slug: string): ProjectRecord | undefined {
  * first — so every generation and applied edit (and every restore) leaves a
  * trail. A rename alone (pkg.name changes, nothing else) does not count as a
  * design change and burns no version slot; see {@link pkgsDiffer}.
+ *
+ * Returns null on success, or a message to show the user. Callers that go on
+ * to navigate to the saved slug must check it: routing to a project that was
+ * never written lands on a 404 with no explanation.
  */
-export function saveProject(record: ProjectRecord, versionLabel?: string): void {
+export function saveProject(record: ProjectRecord, versionLabel?: string): string | null {
   const all = readJson<ProjectRecord[]>(PROJECTS_KEY, []);
   const existing = all.find((r) => r.slug === record.slug);
   if (existing && pkgsDiffer(existing.pkg, record.pkg)) {
     pushVersion(record.slug, existing.pkg, versionLabel ?? "before update");
   }
   const kept = all.filter((r) => r.slug !== record.slug);
-  writeJson(PROJECTS_KEY, [...kept, record]);
+  return writeJson(PROJECTS_KEY, [...kept, record]);
 }
 
-export function deleteProject(slug: string): void {
+/** Returns null on success, or a message to show the user. */
+export function deleteProject(slug: string): string | null {
   const kept = readJson<ProjectRecord[]>(PROJECTS_KEY, []).filter((r) => r.slug !== slug);
-  writeJson(PROJECTS_KEY, kept);
+  return writeJson(PROJECTS_KEY, kept);
 }
 
-/** Update just the display name. Slug is stable — links keep working. */
+/**
+ * Update just the display name. Slug is stable — links keep working.
+ * False means there was nothing to rename; a true return still leaves any
+ * storage problem readable via {@link lastStorageFailure}.
+ */
 export function renameProject(slug: string, name: string): boolean {
   const record = getMyProject(slug);
   const trimmed = name.trim();

@@ -134,7 +134,7 @@ export function ProjectChat({
         onClick={() => setOpen(true)}
         aria-label="Open project chat"
         aria-expanded={false}
-        className="microlabel fixed right-4 bottom-4 z-30 rounded-full border border-line-strong bg-bg-card px-4 py-2 text-ink shadow-lg hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
+        className="microlabel fixed right-4 bottom-20 sm:bottom-4 z-30 rounded-full border border-line-strong bg-bg-card px-4 py-2 text-ink shadow-lg hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
       >
         Chat
       </button>
@@ -144,7 +144,7 @@ export function ProjectChat({
   return (
     <section
       aria-label="Project chat"
-      className="fixed right-4 bottom-4 z-30 flex max-h-[60vh] w-[360px] max-w-[calc(100vw-2rem)] flex-col rounded-md border border-line-strong bg-bg-card shadow-lg"
+      className="fixed right-4 bottom-20 sm:bottom-4 z-30 flex max-h-[60vh] w-[360px] max-w-[calc(100vw-2rem)] flex-col rounded-md border border-line-strong bg-bg-card shadow-lg"
     >
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2">
         <p className="microlabel text-ink">Chat · {record.pkg.name}</p>

@@ -9,9 +9,24 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OpenBlueprint — open-source AI hardware design",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+  ),
+  title: {
+    default: "OpenBlueprint",
+    template: "%s — OpenBlueprint",
+  },
   description:
-    "Describe a hardware project in plain English and get a complete, buildable design package: parts list, wiring diagram, mechanical assembly, and build instructions.",
+    "An open-source tool that turns a hardware idea into a buildable design package. Describe a project, get parts, wiring, mechanics, and build instructions—entirely in your browser, no account required.",
+  applicationName: "OpenBlueprint",
+  openGraph: {
+    siteName: "OpenBlueprint",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({

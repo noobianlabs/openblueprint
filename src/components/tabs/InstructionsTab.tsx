@@ -89,7 +89,7 @@ export function InstructionsTab({ record }: { record: ProjectRecord }) {
                     role="checkbox"
                     aria-checked={checked}
                     onClick={() => check(step.id)}
-                    className="flex w-full items-start gap-3 text-left"
+                    className="flex min-h-10 w-full items-start gap-3 py-1 text-left"
                   >
                     <span
                       className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border text-[10px] ${
@@ -142,7 +142,7 @@ export function InstructionsTab({ record }: { record: ProjectRecord }) {
                       type="button"
                       onClick={() => toggleDetail(step.id)}
                       aria-expanded={isOpen}
-                      className="microlabel mt-2 text-ink-faint hover:text-ink"
+                      className="microlabel mt-2 inline-flex min-h-10 items-center text-ink-faint hover:text-ink"
                     >
                       {isOpen ? "hide details ▴" : "view details ▾"}
                     </button>

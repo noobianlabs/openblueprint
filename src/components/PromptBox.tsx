@@ -31,13 +31,13 @@ export function PromptBox() {
         }}
         placeholder="Ask for a design… e.g. a solar-powered weather station for my balcony"
         rows={2}
-        className="w-full resize-none bg-transparent px-3 py-2 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink-faint"
+        className="w-full resize-none rounded-sm bg-transparent px-3 py-2 text-[13px] leading-relaxed text-ink placeholder:text-ink-faint"
       />
       <div className="flex items-center justify-between px-2 pb-1">
         <button
           type="button"
           onClick={insertIdea}
-          className="microlabel rounded-sm px-2 py-1 hover:bg-bg-card hover:text-ink"
+          className="microlabel flex min-h-10 items-center rounded-sm px-2 hover:bg-bg-card hover:text-ink"
           title="Need an idea?"
         >
           ◇ idea
@@ -50,7 +50,9 @@ export function PromptBox() {
             type="button"
             onClick={submit}
             disabled={!prompt.trim()}
-            className="rounded-sm bg-accent px-3 py-1.5 text-[12px] font-bold text-black transition-opacity disabled:opacity-30"
+            aria-label="Generate design"
+            title="Generate design"
+            className="flex min-h-10 min-w-10 items-center justify-center rounded-sm bg-accent px-3 text-[12px] font-bold text-black transition-opacity disabled:opacity-30"
           >
             →
           </button>

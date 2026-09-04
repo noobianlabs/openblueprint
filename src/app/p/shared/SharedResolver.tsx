@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ProjectView } from "@/components/ProjectView";
-import type { ProjectRecord } from "@/lib/design/schema";
+import type { DesignPackage, ProjectRecord } from "@/lib/design/schema";
 import { decodeShare, ShareDecodeError, type SharePayload } from "@/lib/design/share";
 import { makeUserRecord, saveProject } from "@/lib/store";
 
@@ -13,6 +13,76 @@ type State =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; payload: SharePayload };
+
+/**
+ * `decodeShare` proves the payload has the right *shape* — every field is
+ * present and of the right type. It cannot prove the design refers to itself
+ * consistently, and a link that says "wire part `mcu1` to part `sensor9`"
+ * with no `sensor9` in the parts list decodes cleanly and then blows up a
+ * view. These are the cross-references the views assume.
+ *
+ * Deliberately narrower than the engine's `validateDesign`: that one also
+ * enforces house style (10-16 parts, uppercase tags, 3-4 phases), and a
+ * shared design that breaks a style rule is still perfectly renderable.
+ * Rejecting it would turn a working link into a dead one.
+ *
+ * Returns a human-readable problem, or null if the design hangs together.
+ */
+function referentialProblem(pkg: DesignPackage): string | null {
+  if (pkg.parts.length === 0) {
+    return "This design has no parts in it, so there is nothing to show.";
+  }
+
+  const partIds = new Set(pkg.parts.map((p) => p.id));
+  const pinsById = new Map(pkg.parts.map((p) => [p.id, new Set(p.pins ?? [])]));
+
+  for (const conn of pkg.connections) {
+    for (const end of [conn.from, conn.to]) {
+      if (!partIds.has(end.part)) {
+        return `A wire in this design connects to a part ("${end.part}") that is not in its parts list.`;
+      }
+      if (!pinsById.get(end.part)?.has(end.pin)) {
+        return `A wire in this design lands on a pin ("${end.pin}") that part "${end.part}" does not have.`;
+      }
+    }
+  }
+
+  // A tree nested this deep is malformed rather than merely detailed, and
+  // walking it further risks a stack overflow on a hostile link.
+  const walk = (nodes: DesignPackage["assembly"], depth: number): string | null => {
+    if (depth > 12) {
+      return "The assembly tree in this design is nested far deeper than a real one would be.";
+    }
+    for (const node of nodes) {
+      if (!partIds.has(node.part)) {
+        return `The assembly tree names a part ("${node.part}") that is not in this design's parts list.`;
+      }
+      const deeper = node.children ? walk(node.children, depth + 1) : null;
+      if (deeper) return deeper;
+    }
+    return null;
+  };
+  const assemblyProblem = walk(pkg.assembly, 0);
+  if (assemblyProblem) return assemblyProblem;
+
+  for (const phase of pkg.instructions) {
+    for (const step of phase.steps) {
+      for (const id of step.parts) {
+        if (!partIds.has(id)) {
+          return `An assembly step refers to a part ("${id}") that is not in this design's parts list.`;
+        }
+      }
+    }
+  }
+
+  /* A step naming a tool that is not in tools[] is deliberately not checked:
+     it renders fine and reads fine, and rejecting the link over it would kill
+     a design nobody would call broken. */
+  return null;
+}
+
+const BROKEN_LINK_SUFFIX =
+  " The link is probably damaged, or was made by a different version of the app. Ask whoever sent it for a fresh one.";
 
 /**
  * `/p/shared` has no id of its own — the entire design lives after the `#`
@@ -33,7 +103,16 @@ export function SharedResolver() {
     setState({ kind: "loading" });
     decodeShare(fragment)
       .then((payload) => {
-        if (!cancelled) setState({ kind: "ready", payload });
+        if (cancelled) return;
+        /* Decoding proves the shape; this proves the design refers to itself
+           consistently. Without it a link that passes decoding can still take
+           a view down on render. */
+        const problem = referentialProblem(payload.pkg);
+        if (problem) {
+          setState({ kind: "error", message: problem + BROKEN_LINK_SUFFIX });
+          return;
+        }
+        setState({ kind: "ready", payload });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -95,6 +174,7 @@ export function SharedResolver() {
 function SharedDesign({ payload }: { payload: SharePayload }) {
   const router = useRouter();
   const [copying, setCopying] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const record: ProjectRecord = {
     slug: "shared",
@@ -109,9 +189,16 @@ function SharedDesign({ payload }: { payload: SharePayload }) {
     pkg: payload.pkg,
   };
 
+  /* Navigating after a failed write would land on a project that does not
+     exist — better to say why the copy did not happen. */
   function onCopy() {
     const copy = makeUserRecord(payload.pkg, payload.pkg.name);
-    saveProject(copy);
+    const failure = saveProject(copy);
+    if (failure) {
+      setCopyError(failure);
+      return;
+    }
+    setCopyError(null);
     setCopying(true);
     router.push(`/p/${copy.slug}`);
   }
@@ -133,6 +220,12 @@ function SharedDesign({ payload }: { payload: SharePayload }) {
           ⧉ {copying ? "Copied" : "Copy to my projects"}
         </button>
       </div>
+      {copyError && (
+        <p className="border-b border-line bg-bg-inset px-5 py-2 text-[12px] leading-relaxed text-ink-dim">
+          <span className="microlabel mr-2 text-ink">NOT COPIED</span>
+          {copyError}
+        </p>
+      )}
       <ProjectView record={record} />
     </div>
   );
