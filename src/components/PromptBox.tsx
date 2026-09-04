@@ -2,15 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-const IDEAS = [
-  "a self-watering desk planter that monitors soil moisture",
-  "a bicycle turn-signal vest with wireless handlebar buttons",
-  "a desktop air-quality monitor with an e-ink display",
-  "a cat door that only opens for a specific collar tag",
-  "a pomodoro timer cube that starts when flipped",
-  "a sunrise alarm lamp that fades in over 30 minutes",
-];
+import { ideaAt } from "@/lib/design/ideas";
 
 export function PromptBox() {
   const router = useRouter();
@@ -20,6 +12,10 @@ export function PromptBox() {
     const p = prompt.trim();
     if (!p) return;
     router.push(`/new?prompt=${encodeURIComponent(p)}`);
+  }
+
+  function insertIdea() {
+    setPrompt(ideaAt());
   }
 
   return (
@@ -40,7 +36,7 @@ export function PromptBox() {
       <div className="flex items-center justify-between px-2 pb-1">
         <button
           type="button"
-          onClick={() => setPrompt(IDEAS[Math.floor(Math.random() * IDEAS.length)])}
+          onClick={insertIdea}
           className="microlabel rounded-sm px-2 py-1 hover:bg-bg-card hover:text-ink"
           title="Need an idea?"
         >

@@ -13,6 +13,8 @@ import { matchArchetype } from "./engine/local";
 
 const PROJECTS_KEY = "obp:projects";
 const STARS_KEY = "obp:stars";
+const VERSIONS_PREFIX = "obp:versions:";
+const MAX_VERSIONS = 12;
 
 /* ---------- storage plumbing ---------- */
 
@@ -61,15 +63,80 @@ export function getMyProject(slug: string): ProjectRecord | undefined {
   return listMyProjects().find((r) => r.slug === slug);
 }
 
-/** Upsert by slug. */
-export function saveProject(record: ProjectRecord): void {
-  const existing = readJson<ProjectRecord[]>(PROJECTS_KEY, []).filter((r) => r.slug !== record.slug);
-  writeJson(PROJECTS_KEY, [...existing, record]);
+/**
+ * Upsert by slug. If this overwrites an existing record whose design differs
+ * from the incoming one, the OLD package is snapshotted into version history
+ * first — so every generation and applied edit (and every restore) leaves a
+ * trail. A rename alone (pkg.name changes, nothing else) does not count as a
+ * design change and burns no version slot; see {@link pkgsDiffer}.
+ */
+export function saveProject(record: ProjectRecord, versionLabel?: string): void {
+  const all = readJson<ProjectRecord[]>(PROJECTS_KEY, []);
+  const existing = all.find((r) => r.slug === record.slug);
+  if (existing && pkgsDiffer(existing.pkg, record.pkg)) {
+    pushVersion(record.slug, existing.pkg, versionLabel ?? "before update");
+  }
+  const kept = all.filter((r) => r.slug !== record.slug);
+  writeJson(PROJECTS_KEY, [...kept, record]);
 }
 
 export function deleteProject(slug: string): void {
   const kept = readJson<ProjectRecord[]>(PROJECTS_KEY, []).filter((r) => r.slug !== slug);
   writeJson(PROJECTS_KEY, kept);
+}
+
+/** Update just the display name. Slug is stable — links keep working. */
+export function renameProject(slug: string, name: string): boolean {
+  const record = getMyProject(slug);
+  const trimmed = name.trim();
+  if (!record || !trimmed) return false;
+  saveProject({ ...record, pkg: { ...record.pkg, name: trimmed } });
+  return true;
+}
+
+/* ---------- version history ---------- */
+
+export interface VersionEntry {
+  /** ISO date the snapshot was taken */
+  at: string;
+  /** What produced this snapshot, e.g. "before update", "before restore" */
+  label: string;
+  pkg: DesignPackage;
+}
+
+function versionsKey(slug: string): string {
+  return `${VERSIONS_PREFIX}${slug}`;
+}
+
+/** Same design, ignoring the name — a rename alone must not read as a diff. */
+function pkgsDiffer(a: DesignPackage, b: DesignPackage): boolean {
+  return JSON.stringify({ ...a, name: "" }) !== JSON.stringify({ ...b, name: "" });
+}
+
+function pushVersion(slug: string, pkg: DesignPackage, label: string): void {
+  const entry: VersionEntry = { at: new Date().toISOString(), label, pkg };
+  const next = [entry, ...listVersions(slug)].slice(0, MAX_VERSIONS);
+  writeJson(versionsKey(slug), next);
+}
+
+/** Newest first, capped at 12. */
+export function listVersions(slug: string): VersionEntry[] {
+  return readJson<VersionEntry[]>(versionsKey(slug), []).filter(
+    (v) => v && typeof v.at === "string" && typeof v.label === "string" && v.pkg,
+  );
+}
+
+/**
+ * Swap a past version's package into the live record. Goes through
+ * saveProject, so the state being replaced is itself snapshotted first
+ * (labelled "before restore") — restoring is never destructive.
+ */
+export function restoreVersion(slug: string, index: number): boolean {
+  const record = getMyProject(slug);
+  const version = listVersions(slug)[index];
+  if (!record || !version) return false;
+  saveProject({ ...record, pkg: version.pkg }, "before restore");
+  return true;
 }
 
 /* ---------- stars ---------- */

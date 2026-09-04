@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProjectChat } from "@/components/ProjectChat";
 import { ProjectView } from "@/components/ProjectView";
 import type { ProjectRecord } from "@/lib/design/schema";
 import { getSeed } from "@/lib/design/seeds";
@@ -13,6 +15,7 @@ import { getMyProject } from "@/lib/store";
  * mount — hence the loading beat.
  */
 export function ProjectResolver({ slug }: { slug: string }) {
+  const router = useRouter();
   const seed = getSeed(slug);
   const [mounted, setMounted] = useState(false);
   const [mine, setMine] = useState<ProjectRecord | undefined>(undefined);
@@ -23,7 +26,28 @@ export function ProjectResolver({ slug }: { slug: string }) {
     setMounted(true);
   }, [slug, seed]);
 
-  if (seed) return <ProjectView record={seed} />;
+  /**
+   * An applied edit is already persisted by the time this runs. A seed forks
+   * to a copy under a new slug, so that case navigates; a design of your own
+   * changes in place, and re-reading the record is enough — every tab derives
+   * from `record.pkg`, so the new package propagates without a reload.
+   */
+  function onEdited(next: ProjectRecord) {
+    if (next.slug !== slug) {
+      router.push(`/p/${next.slug}`);
+      return;
+    }
+    setMine(next);
+  }
+
+  if (seed) {
+    return (
+      <>
+        <ProjectView record={seed} />
+        <ProjectChat record={seed} onEdited={onEdited} />
+      </>
+    );
+  }
 
   if (!mounted) {
     return (
@@ -33,7 +57,14 @@ export function ProjectResolver({ slug }: { slug: string }) {
     );
   }
 
-  if (mine) return <ProjectView record={mine} />;
+  if (mine) {
+    return (
+      <>
+        <ProjectView record={mine} />
+        <ProjectChat record={mine} onEdited={onEdited} />
+      </>
+    );
+  }
 
   return (
     <div className="blueprint-grid flex min-h-screen items-center justify-center px-5">

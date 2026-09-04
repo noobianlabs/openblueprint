@@ -15,6 +15,9 @@ export function Nav() {
         <Link href="/about" className="microlabel hover:text-ink">
           About
         </Link>
+        <Link href="/faq" className="microlabel hover:text-ink">
+          FAQ
+        </Link>
         <Link href="/projects" className="microlabel hover:text-ink">
           My Projects
         </Link>

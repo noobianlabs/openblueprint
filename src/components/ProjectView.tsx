@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProjectRecord } from "@/lib/design/schema";
-import { isStarred, makeUserRecord, saveProject, toggleStar } from "@/lib/store";
+import { isStarred, makeUserRecord, renameProject, saveProject, toggleStar } from "@/lib/store";
 import { buildProjectZip, exportFilename } from "@/lib/design/export";
+import { shareUrl } from "@/lib/design/share";
 import { InfoTab } from "@/components/tabs/InfoTab";
 import { PartsTab } from "@/components/tabs/PartsTab";
 import { WiringTab } from "@/components/tabs/WiringTab";
 import { MechTab } from "@/components/tabs/MechTab";
 import { ArchTab } from "@/components/tabs/ArchTab";
 import { InstructionsTab } from "@/components/tabs/InstructionsTab";
+import { VersionHistory } from "@/components/VersionHistory";
 
 const TABS = [
   { key: "info", label: "Info", icon: "▤" },
@@ -24,12 +26,46 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+const DEFAULT_SHARE_TITLE = "Copy a read-only share link — the design travels in the URL, nothing is uploaded";
+
+/** navigator.clipboard needs a secure context; execCommand is the fallback everywhere else. */
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // fall through to the execCommand fallback below
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 export function ProjectView({ record }: { record: ProjectRecord }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("info");
   const [starred, setStarred] = useState(false);
   const [copying, setCopying] = useState(false);
   const [exportState, setExportState] = useState<"idle" | "working" | "done">("idle");
+  const [shareState, setShareState] = useState<"idle" | "working" | "copied">("idle");
+  const [shareTitle, setShareTitle] = useState(DEFAULT_SHARE_TITLE);
+  const isOwned = record.source === "user";
+  const [projectName, setProjectName] = useState(record.pkg.name);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(record.pkg.name);
+  const skipBlurRef = useRef(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   /* Star state is browser-local; read it after mount so SSR and the first
      client render agree. */
@@ -56,19 +92,46 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
     window.history.replaceState(null, "", url);
   }
 
+  /* A rename is committed to storage immediately, but the `record` prop is
+     resolved upstream and does not change — so the views would keep the old
+     name until a reload. Hand them a record carrying the name on screen. */
+  const shown =
+    projectName === record.pkg.name
+      ? record
+      : { ...record, pkg: { ...record.pkg, name: projectName } };
+
   function onStar() {
     setStarred(toggleStar(record.slug));
+  }
+
+  async function onShare() {
+    if (shareState === "working") return;
+    setShareState("working");
+    try {
+      const { url, oversized } = await shareUrl(shown);
+      setShareTitle(
+        oversized
+          ? "Link copied — this design is large, so the link is long and some apps may truncate it"
+          : DEFAULT_SHARE_TITLE,
+      );
+      await copyToClipboard(url);
+      setShareState("copied");
+      window.setTimeout(() => setShareState("idle"), 2000);
+    } catch {
+      // Never strand the button mid-flight; nothing was copied.
+      setShareState("idle");
+    }
   }
 
   async function onExport() {
     setExportState("working");
     let url: string | null = null;
     try {
-      const blob = await buildProjectZip(record, new Date());
+      const blob = await buildProjectZip(shown, new Date());
       url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = exportFilename(record);
+      link.download = exportFilename(shown);
       link.click();
       setExportState("done");
       window.setTimeout(() => setExportState("idle"), 2000);
@@ -81,19 +144,89 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
   }
 
   function onCopy() {
-    const copy = makeUserRecord(record.pkg, record.pkg.name);
+    const copy = makeUserRecord(shown.pkg, shown.pkg.name);
     saveProject(copy);
     setCopying(true);
     router.push(`/p/${copy.slug}`);
+  }
+
+  function startRename() {
+    setNameDraft(projectName);
+    setRenaming(true);
+  }
+
+  function commitRename() {
+    setRenaming(false);
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === projectName) {
+      setNameDraft(projectName);
+      return;
+    }
+    setProjectName(trimmed);
+    renameProject(record.slug, trimmed);
+  }
+
+  function cancelRename() {
+    setRenaming(false);
+    setNameDraft(projectName);
+  }
+
+  function onNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      skipBlurRef.current = true;
+      commitRename();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      skipBlurRef.current = true;
+      cancelRename();
+    }
+  }
+
+  function onNameBlur() {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
+    commitRename();
   }
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5">
-          <Link href="/" className="microlabel shrink-0 hover:text-ink">
-            ← Community
-          </Link>
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
+            <Link href="/" className="microlabel shrink-0 hover:text-ink">
+              ← Community
+            </Link>
+            <span className="h-4 w-px shrink-0 bg-line" />
+            {renaming ? (
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={onNameKeyDown}
+                onBlur={onNameBlur}
+                className="min-w-0 max-w-[16rem] rounded-sm border border-line-strong bg-bg-inset px-2 py-1 text-[13px] text-ink outline-none"
+              />
+            ) : (
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-[13px] font-semibold text-ink" title={projectName}>
+                  {projectName}
+                </span>
+                {isOwned && (
+                  <button
+                    type="button"
+                    onClick={startRename}
+                    title="Rename project"
+                    className="shrink-0 text-ink-faint hover:text-ink"
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="order-3 flex w-full justify-center gap-1 sm:order-none sm:w-auto">
             {TABS.map((t) => (
               <button
@@ -111,7 +244,20 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
               </button>
             ))}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="relative flex shrink-0 items-center gap-2">
+            {isOwned && (
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                aria-pressed={showHistory}
+                className={`microlabel rounded-sm border px-3 py-1.5 hover:border-line-strong ${
+                  showHistory ? "border-line-strong bg-bg-raised text-ink" : "border-line hover:text-ink"
+                }`}
+                title="Version history"
+              >
+                ⟲ History
+              </button>
+            )}
             <button
               type="button"
               onClick={onStar}
@@ -134,6 +280,15 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
             </button>
             <button
               type="button"
+              onClick={onShare}
+              disabled={shareState === "working"}
+              className="microlabel rounded-sm border border-line px-3 py-1.5 hover:border-line-strong hover:text-ink disabled:opacity-60"
+              title={shareTitle}
+            >
+              ⤴ {shareState === "copied" ? "Copied link" : "Share"}
+            </button>
+            <button
+              type="button"
               onClick={onExport}
               disabled={exportState === "working"}
               className="microlabel rounded-sm border border-line px-3 py-1.5 hover:border-line-strong hover:text-ink disabled:opacity-60"
@@ -141,17 +296,25 @@ export function ProjectView({ record }: { record: ProjectRecord }) {
             >
               ↓ {exportState === "working" ? "Packing" : exportState === "done" ? "Saved" : "Export"}
             </button>
+            {isOwned && showHistory && (
+              <div className="absolute top-full right-0 z-50 mt-2">
+                <VersionHistory
+                  slug={record.slug}
+                  onRestored={() => window.location.reload()}
+                />
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="flex-1">
-        {tab === "info" && <InfoTab record={record} />}
-        {tab === "parts" && <PartsTab record={record} />}
-        {tab === "arch" && <ArchTab record={record} />}
-        {tab === "wiring" && <WiringTab record={record} />}
-        {tab === "mech" && <MechTab record={record} />}
-        {tab === "instructions" && <InstructionsTab record={record} />}
+        {tab === "info" && <InfoTab record={shown} />}
+        {tab === "parts" && <PartsTab record={shown} />}
+        {tab === "arch" && <ArchTab record={shown} />}
+        {tab === "wiring" && <WiringTab record={shown} />}
+        {tab === "mech" && <MechTab record={shown} />}
+        {tab === "instructions" && <InstructionsTab record={shown} />}
       </main>
     </div>
   );

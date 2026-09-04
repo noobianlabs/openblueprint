@@ -11,6 +11,9 @@ export function Footer() {
           <Link href="/about" className="microlabel hover:text-ink">
             About
           </Link>
+          <Link href="/faq" className="microlabel hover:text-ink">
+            FAQ
+          </Link>
           <a
             href="https://github.com/noobianlabs/openblueprint"
             target="_blank"
